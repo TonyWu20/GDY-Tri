@@ -1,5 +1,7 @@
 extern crate nalgebra as na;
 
+use ::core::fmt;
+
 use na::*;
 pub struct Atom {
     element_name: String,
@@ -20,8 +22,14 @@ impl Atom {
     pub fn element_name(&self) -> &str {
         &self.element_name
     }
+    pub fn set_element_name(&mut self, new_name: &str) {
+        self.element_name = new_name.to_string();
+    }
     pub fn element_id(&self) -> u32 {
         self.element_id
+    }
+    pub fn set_element_id(&mut self, new_id: u32) {
+        self.element_id = new_id;
     }
     pub fn xyz(&self) -> &Point3<f64> {
         &self.xyz
@@ -47,6 +55,16 @@ impl Atom {
     }
 }
 
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Element: {}\nElement ID: {}\ncoord: {}\nAtom ID: {}",
+            self.element_name, self.element_id, self.xyz, self.atom_id
+        )
+    }
+}
+
 pub struct Molecule {
     pub mol_name: String,
     vector_atoms: Vec<Atom>,
@@ -59,14 +77,23 @@ impl Molecule {
             vector_atoms,
         }
     }
-    pub fn get_atom_by_id(&self, atom_id: u32) -> &Atom {
-        &self.vector_atoms[atom_id as usize]
+    /// Return an atom with the given id, starting from 1 (caution!)
+    pub fn get_atom_by_id(&self, atom_id: u32) -> Option<&Atom> {
+        self.vector_atoms.get(atom_id as usize - 1)
     }
+    pub fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Option<&mut Atom> {
+        self.vector_atoms.get_mut(atom_id as usize - 1)
+    }
+    /// Push a new atom to the atom vectors.
     pub fn append_atom(&mut self, new_atom: Atom) {
         self.vector_atoms.push(new_atom);
     }
+    /// Return the current number of atoms of the molecule.
     pub fn number_of_atoms(&self) -> usize {
         self.vector_atoms.len()
+    }
+    pub fn atoms_iterator(&self) -> std::slice::Iter<Atom> {
+        self.vector_atoms.iter()
     }
 }
 
@@ -90,6 +117,9 @@ impl Lattice {
             metal_sites,
             adsorbate,
         }
+    }
+    pub fn get_mut_molecule(&mut self) -> &mut Molecule {
+        &mut self.molecule
     }
     pub fn get_lattice_vectors(&self) -> &Matrix3<f64> {
         &self.lattice_vectors
@@ -119,6 +149,33 @@ impl Lattice {
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
         self.rotate(rot_quatd);
+    }
+    pub fn get_vector_ab(&self, atom_a_id: u32, atom_b_id: u32) -> Vector3<f64> {
+        let atom_a: &Atom = self.molecule.get_atom_by_id(atom_a_id).unwrap();
+        let atom_a_xyz = atom_a.xyz();
+        let atom_b: &Atom = self.molecule.get_atom_by_id(atom_b_id).unwrap();
+        let atom_b_xyz = atom_b.xyz();
+        atom_b_xyz - atom_a_xyz
+    }
+    pub fn export_msi(&self) -> String {
+        let headers: String = concat!(
+            "#MSI CERIUS2 DataModel File Version 4 0\n",
+            "(1 Model\n",
+            "  (A I CRY/DISPLAY (192 256))\n",
+            "  (A I PeriodicType 100)\n",
+            "  (A C SpaceGroup \"1 1\")\n",
+            "  (A D A3 (16.39518593025 -9.465765010246 0))\n",
+            "  (A D B3 (0 18.93153002049 0))\n",
+            "  (A D C3 (0 0 9.999213039981))\n",
+            "  (A D CRY/TOLERANCE 0.05)\n"
+        )
+        .to_string();
+        let mut atom_strings: String = "".to_string();
+        for atom in self.molecule.atoms_iterator() {
+            atom_strings.push_str(&atom.text());
+        }
+        let contents: String = format!("{}{})", headers, atom_strings);
+        contents
     }
 }
 
