@@ -5,6 +5,7 @@ pub mod msi_editor {
     };
 
     use gdy_model::{Atom, Lattice};
+    use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
 
@@ -17,16 +18,13 @@ pub mod msi_editor {
         target_atom.set_element_name(new_element_name);
         target_atom.set_element_id(new_element_id);
     }
-    pub fn iterate_over_elements(
-        target_lattice: &mut Lattice,
-        family: &str,
-        to_use_metals: &Vec<&Element>,
-    ) {
+    pub fn iterate_over_elements(target_lattice: &mut Lattice, to_use_metals: &Vec<&Element>) {
         let mut export_dirs: Vec<PathBuf> = vec![];
         for metal in to_use_metals.iter() {
-            export_dirs.push(export_destination(family, metal.symbol));
+            export_dirs.push(export_destination(metal));
         }
         let metals_dirs = std::iter::zip(to_use_metals, export_dirs);
+        let bar = ProgressBar::new((to_use_metals.len().pow(2)) as u64);
         for (item, dir) in metals_dirs {
             for item_b in to_use_metals.iter() {
                 let atom_1 = target_lattice.molecule.get_mut_atom_by_id(73).unwrap();
@@ -41,11 +39,20 @@ pub mod msi_editor {
                     item.symbol, item.symbol, item_b.symbol
                 ));
                 fs::write(filepath, text).expect("unable to write file");
+                bar.inc(1);
             }
         }
+        bar.finish();
     }
-    fn export_destination(family: &str, main_element: &str) -> PathBuf {
-        let dir_path = format!("./GDY_TAC_models/{}/{}", family, main_element);
+    fn export_destination(element: &Element) -> PathBuf {
+        let family: &str = match element.atomic_number {
+            21..=30 => "3d",
+            39..=48 => "4d",
+            72..=80 => "5d",
+            57..=71 => "rare_earth",
+            _ => "else",
+        };
+        let dir_path = format!("./GDY_TAC_models/{}/{}", family, element.symbol);
         create_dir_all(&dir_path).unwrap_or_else(|why| {
             println!("! {:?}", why.kind());
         });
@@ -53,14 +60,16 @@ pub mod msi_editor {
     }
     pub fn generate_all_base_models(src_filename: &str) {
         let mut src_lattice = parse_lattice(src_filename);
-        let elements = pt::periodic_table();
-        let metals_3d = elements[20..30].to_vec();
-        let metals_4d = elements[38..48].to_vec();
-        let metals_5d = elements[71..80].to_vec();
-        let metals_rare_earth = elements[56..71].to_vec();
-        iterate_over_elements(&mut src_lattice, "3d", &metals_3d);
-        iterate_over_elements(&mut src_lattice, "4d", &metals_4d);
-        iterate_over_elements(&mut src_lattice, "5d", &metals_5d);
-        iterate_over_elements(&mut src_lattice, "rare_earth", &metals_rare_earth);
+        let elements: &[&Element] = pt::periodic_table();
+        let metals_3d: &[&Element] = &elements[20..30];
+        let metals_4d: &[&Element] = &elements[38..48];
+        let metals_5d: &[&Element] = &elements[71..80];
+        let metals_rare_earth: &[&Element] = &elements[56..71];
+        let mut total_elements: Vec<&Element> = vec![];
+        total_elements.extend_from_slice(metals_3d);
+        total_elements.extend_from_slice(metals_4d);
+        total_elements.extend_from_slice(metals_5d);
+        total_elements.extend_from_slice(metals_rare_earth);
+        iterate_over_elements(&mut src_lattice, &total_elements);
     }
 }

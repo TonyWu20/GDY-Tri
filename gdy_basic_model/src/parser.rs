@@ -1,5 +1,7 @@
 pub mod msi_parser {
-    use gdy_model::Atom;
+    use std::fs::read_to_string;
+
+    use gdy_model::{Atom, Lattice, Molecule};
     use nalgebra::{Matrix3, Point3, Vector3};
     use regex::{Captures, Regex};
 
@@ -43,5 +45,14 @@ pub mod msi_parser {
             lattice_vectors.push(vector);
         }
         Matrix3::from_columns(&lattice_vectors)
+    }
+    pub fn parse_lattice(filename: &str) -> Lattice {
+        let contents = read_to_string(filename).expect("Something went wrong in reading file");
+        let mol_name: String = filename.split(".").next().unwrap().to_owned();
+        let atoms: Vec<Atom> = parse_atom(&contents);
+        let mol: Molecule = Molecule::new(mol_name, atoms);
+        let lat_vectors: Matrix3<f64> = parse_lattice_vectors(&contents);
+        let lattice: Lattice = Lattice::new(mol, lat_vectors, vec![73, 74, 75], None);
+        lattice
     }
 }

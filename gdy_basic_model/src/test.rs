@@ -16,7 +16,7 @@ mod test {
 
     #[test]
     fn read_and_write() {
-        let filename = "GDY_tri.msi";
+        let filename = "./resources/GDY_tri.msi";
         let base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
         println!("{}", base_lat.export_msi());
     }
