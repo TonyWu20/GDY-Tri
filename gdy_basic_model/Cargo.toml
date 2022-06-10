@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
  regex = "1"
  nalgebra = "*"
+ periodic_table = "0.3.2"
+ indicatif = "0"
