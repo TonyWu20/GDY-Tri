@@ -1,6 +1,7 @@
 extern crate nalgebra as na;
 
 use ::core::fmt;
+use std::{cmp::Ordering, collections::HashSet};
 
 use na::*;
 pub struct Atom {
@@ -64,6 +65,26 @@ impl fmt::Display for Atom {
         )
     }
 }
+
+impl Ord for Atom {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.atom_id.cmp(&other.atom_id)
+    }
+}
+
+impl PartialOrd for Atom {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Atom {
+    fn eq(&self, other: &Self) -> bool {
+        self.atom_id == other.atom_id
+    }
+}
+
+impl Eq for Atom {}
 
 pub struct Molecule {
     pub mol_name: String,
@@ -130,6 +151,16 @@ impl Lattice {
     pub fn get_metal_sites(&self) -> &Vec<u32> {
         &self.metal_sites
     }
+    pub fn get_element_list(&self) -> Vec<String> {
+        let mut all_elms: Vec<String> = vec![];
+        for atom in self.molecule.atoms_iterator() {
+            all_elms.push(atom.element_name().to_string());
+        }
+        let elm_hash: HashSet<String> = all_elms.drain(..).collect();
+        let mut elm_list: Vec<String> = vec![];
+        elm_list.extend(elm_hash.into_iter());
+        elm_list
+    }
     pub fn get_adsorbate_name(&self) -> Option<&str> {
         match &self.adsorbate {
             Some(x) => Some(x.as_str()),
@@ -179,6 +210,36 @@ impl Lattice {
     }
 }
 
+pub struct Cell {
+    pub lattice: Lattice,
+    sorted: bool,
+}
+
+impl Cell {
+    pub fn new(lattice: Lattice, sorted: bool) -> Self {
+        Self { lattice, sorted }
+    }
+    pub fn sort_atoms_by_elements(&mut self) {
+        self.lattice.molecule.vector_atoms.sort();
+        self.sorted = true;
+    }
+    pub fn write_block(&self, block_name: &str, content: &str) -> String {
+        format!(
+            "%%BlOCK {}\n{}%%ENDBLOCK {}\n\n",
+            block_name, content, block_name
+        )
+    }
+    pub fn lattice_vector_str(&self) -> String {
+        let a = self.lattice.get_lattice_vectors().column(0);
+        let b = self.lattice.get_lattice_vectors().column(1);
+        let c = self.lattice.get_lattice_vectors().column(2);
+        format!(
+            "{:24.18}{:24.18}{:24.18}\n{:24.18}{:24.18}{:24.18}\n{:24.18}{:24.18}{:24.18}\n",
+            a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z
+        )
+    }
+}
+
 trait Transformation {
     fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>);
     fn translate(&mut self, translate_matrix: na::Translation<f64, 3>);
@@ -209,4 +270,33 @@ impl Transformation for Lattice {
     fn translate(&mut self, translate_matrix: na::Translation<f64, 3>) {
         self.molecule.translate(translate_matrix);
     }
+}
+
+pub fn fractional_coord_matrix(lattice: &Lattice) -> Matrix3<f64> {
+    let lattice_vectors = lattice.get_lattice_vectors();
+    let vec_a = lattice_vectors.column(0);
+    let vec_b = lattice_vectors.column(1);
+    let vec_c = lattice_vectors.column(2);
+    let len_a: f64 = vec_a.norm();
+    let len_b: f64 = vec_b.norm();
+    let len_c: f64 = vec_c.norm();
+    let (alpha, beta, gamma) = (
+        vec_b.angle(&vec_c),
+        vec_a.angle(&vec_c),
+        vec_a.angle(&vec_b),
+    );
+    let vol = vec_a.dot(&vec_b.cross(&vec_c));
+    let to_cart = Matrix3::new(
+        len_a,
+        len_b * gamma.cos(),
+        len_c * beta.cos(),
+        0.0,
+        len_b * gamma.sin(),
+        len_c * ((alpha) - beta.cos() * gamma.cos()) / gamma.sin(),
+        0.0,
+        0.0,
+        vol / (len_a * len_b * gamma.sin()),
+    );
+    let to_frac = to_cart.try_inverse().unwrap();
+    to_frac
 }
