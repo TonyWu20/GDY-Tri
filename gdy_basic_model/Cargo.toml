@@ -9,4 +9,7 @@ edition = "2021"
  regex = "1"
  nalgebra = "*"
  periodic_table = "0.3.2"
+ periodic-table-on-an-enum = "0.3.2"
  indicatif = "0"
+ serde_yaml = "0.8.*"
+ serde = {version= "*", features=["derive"]}
