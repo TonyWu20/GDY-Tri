@@ -1,35 +1,74 @@
+pub mod external_info;
+
 extern crate nalgebra as na;
 
 use ::core::fmt;
-use std::{cmp::Ordering, collections::HashSet};
+
+use external_info::element_table::Element;
+use periodic_table_on_an_enum as pt_enum;
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use na::*;
+
+// Shared behaviour
+pub trait Export {
+    fn format_output(&self) -> String;
+}
+trait Transformation {
+    fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>);
+    fn translate(&mut self, translate_matrix: na::Translation<f64, 3>);
+}
+// trait ends
+
+// Atom
+#[derive(Clone)]
 pub struct Atom {
     element_name: String,
-    element_id: u32,
+    element_id: u8,
     xyz: Point3<f64>,
-    atom_id: u32,
+    atom_id: u8,
+    // lcao: u8,
+    // mass: f64,
+    // pot: String,
+    // spin: u8,
 }
 
 impl Atom {
-    pub fn new(element_name: String, element_id: u32, xyz: Point3<f64>, atom_id: u32) -> Self {
+    pub fn new(
+        element_name: String,
+        element_id: u8,
+        xyz: Point3<f64>,
+        atom_id: u8,
+        // lcao: u8,
+        // mass: f64,
+        // pot: String,
+        // spin: u8,
+    ) -> Self {
         Self {
             element_name,
             element_id,
             xyz,
             atom_id,
+            // lcao,
+            // mass,
+            // pot,
+            // spin,
         }
     }
+
     pub fn element_name(&self) -> &str {
         &self.element_name
     }
     pub fn set_element_name(&mut self, new_name: &str) {
         self.element_name = new_name.to_string();
     }
-    pub fn element_id(&self) -> u32 {
+    pub fn element_id(&self) -> u8 {
         self.element_id
     }
-    pub fn set_element_id(&mut self, new_id: u32) {
+    pub fn set_element_id(&mut self, new_id: u8) {
         self.element_id = new_id;
     }
     pub fn xyz(&self) -> &Point3<f64> {
@@ -38,12 +77,33 @@ impl Atom {
     pub fn set_xyz(&mut self, new_xyz: Point3<f64>) {
         self.xyz = new_xyz;
     }
-    pub fn atom_id(&self) -> u32 {
+    pub fn atom_id(&self) -> u8 {
         self.atom_id
     }
-    pub fn text(&self) -> String {
+    // pub fn lcao(&self) -> u8 {
+    //     self.lcao
+    // }
+    // pub fn spin(&self) -> u8 {
+    //     self.spin
+    // }
+    // pub fn potential_file(&self) -> String {
+    //     self.pot.to_string()
+    // }
+    // pub fn mass(&self) -> f64 {
+    //     self.mass
+    // }
+}
+
+impl Export for Atom {
+    fn format_output(&self) -> String {
         let msi_output: String = format!(
-            "  ({item_id} Atom\n    (A C ACL \"{elm_id} {elm}\")\n    (A C Label \"{elm}\")\n    (A D XYZ ({x:.12} {y:.12} {z:.12}))\n    (A I Id {atom_id})\n  )\n",
+            r#"  ({item_id} Atom
+    (A C ACL "{elm_id} {elm}")
+    (A C Label "{elm}")
+    (A D XYZ ({x:.12} {y:.12} {z:.12}))
+    (A I Id {atom_id})
+  )
+"#,
             item_id = self.atom_id() + 1,
             elm_id = self.element_id(),
             elm = self.element_name(),
@@ -85,6 +145,7 @@ impl PartialEq for Atom {
 }
 
 impl Eq for Atom {}
+// End Atom
 
 pub struct Molecule {
     pub mol_name: String,
@@ -115,6 +176,15 @@ impl Molecule {
     }
     pub fn atoms_iterator(&self) -> std::slice::Iter<Atom> {
         self.vector_atoms.iter()
+    }
+}
+
+impl Export for Molecule {
+    fn format_output(&self) -> String {
+        self.atoms_iterator()
+            .map(|x| x.format_output())
+            .collect::<Vec<String>>()
+            .join("")
     }
 }
 
@@ -151,14 +221,28 @@ impl Lattice {
     pub fn get_metal_sites(&self) -> &Vec<u32> {
         &self.metal_sites
     }
+    // Get element list sorted by atomic number
     pub fn get_element_list(&self) -> Vec<String> {
-        let mut all_elms: Vec<String> = vec![];
-        for atom in self.molecule.atoms_iterator() {
-            all_elms.push(atom.element_name().to_string());
-        }
-        let elm_hash: HashSet<String> = all_elms.drain(..).collect();
         let mut elm_list: Vec<String> = vec![];
-        elm_list.extend(elm_hash.into_iter());
+        elm_list.extend(
+            self.molecule
+                .atoms_iterator()
+                .map(|atom| atom.element_name().to_string())
+                .collect::<Vec<String>>()
+                .drain(..)
+                .collect::<HashSet<String>>()
+                .into_iter(),
+        );
+        elm_list.sort_unstable_by(|a, b| {
+            pt_enum::Element::from_symbol(&a)
+                .unwrap()
+                .get_atomic_number()
+                .cmp(
+                    &pt_enum::Element::from_symbol(&b)
+                        .unwrap()
+                        .get_atomic_number(),
+                )
+        });
         elm_list
     }
     pub fn get_adsorbate_name(&self) -> Option<&str> {
@@ -188,9 +272,12 @@ impl Lattice {
         let atom_b_xyz = atom_b.xyz();
         atom_b_xyz - atom_a_xyz
     }
-    pub fn export_msi(&self) -> String {
+}
+
+impl Export for Lattice {
+    fn format_output(&self) -> String {
         let headers: String = concat!(
-            "#MSI CERIUS2 DataModel File Version 4 0\n",
+            "# MSI CERIUS2 DataModel File Version 4 0\n",
             "(1 Model\n",
             "  (A I CRY/DISPLAY (192 256))\n",
             "  (A I PeriodicType 100)\n",
@@ -201,62 +288,160 @@ impl Lattice {
             "  (A D CRY/TOLERANCE 0.05)\n"
         )
         .to_string();
-        let mut atom_strings: String = "".to_string();
-        for atom in self.molecule.atoms_iterator() {
-            atom_strings.push_str(&atom.text());
-        }
+        let atom_strings: String = self.molecule.format_output();
         let contents: String = format!("{}{})", headers, atom_strings);
         contents
     }
 }
 
-pub struct Cell {
-    pub lattice: Lattice,
+pub struct Cell<'a> {
+    pub lattice: &'a mut Lattice,
     sorted: bool,
 }
 
-impl Cell {
-    pub fn new(lattice: Lattice, sorted: bool) -> Self {
+impl<'a> Cell<'a> {
+    pub fn new(lattice: &'a mut Lattice, sorted: bool) -> Self {
         Self { lattice, sorted }
     }
     pub fn sort_atoms_by_elements(&mut self) {
         self.lattice.molecule.vector_atoms.sort();
         self.sorted = true;
     }
-    pub fn write_block(&self, block_name: &str, content: &str) -> String {
+    // Accept tuple which has name + content
+    fn write_block(&self, block: (String, String)) -> String {
+        let (block_name, content) = block;
         format!(
             "%%BlOCK {}\n{}%%ENDBLOCK {}\n\n",
             block_name, content, block_name
         )
     }
-    pub fn lattice_vector_str(&self) -> String {
-        let a = self.lattice.get_lattice_vectors().column(0);
-        let b = self.lattice.get_lattice_vectors().column(1);
-        let c = self.lattice.get_lattice_vectors().column(2);
-        format!(
-            "{:24.18}{:24.18}{:24.18}\n{:24.18}{:24.18}{:24.18}\n{:24.18}{:24.18}{:24.18}\n",
-            a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z
-        )
+    fn lattice_vector_str(&self) -> (String, String) {
+        let vectors = self.lattice.get_lattice_vectors();
+        let mut vectors_string = String::new();
+        vectors.column_iter().for_each(|col| {
+            vectors_string.push_str(&format!("{:24.18}{:24.18}{:24.18}\n", col.x, col.y, col.z));
+        });
+        ("LATTICE_CART".to_string(), vectors_string)
     }
-}
-
-trait Transformation {
-    fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>);
-    fn translate(&mut self, translate_matrix: na::Translation<f64, 3>);
+    fn positions_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+        assert!(self.sorted == true);
+        let mut pos_strings = String::new();
+        self.lattice.molecule.vector_atoms.iter().for_each(|atom| {
+            let frac_coord = fractional_coord_matrix(&self.lattice) * atom.xyz();
+            let atom_info = element_info.get(atom.element_name()).expect(&format!(
+                "Element {} not in element hash table!",
+                atom.element_name()
+            ));
+            if atom_info.spin > 0 {
+                let line = format!(
+                    "{:>3}{:20.16}{:20.16}{:20.16} SPIN={:14.10}\n",
+                    atom.element_name(),
+                    frac_coord.x,
+                    frac_coord.y,
+                    frac_coord.z,
+                    atom_info.spin as f64
+                );
+                pos_strings.push_str(&line);
+            } else {
+                let line = format!(
+                    "{:>3}{:20.16}{:20.16}{:20.16}\n",
+                    atom.element_name(),
+                    frac_coord.x,
+                    frac_coord.y,
+                    frac_coord.z,
+                );
+                pos_strings.push_str(&line);
+            }
+        });
+        ("POSITIONS_FRAC".to_string(), pos_strings)
+    }
+    fn kpoints_list_str(&self) -> (String, String) {
+        ("KPOINTS_LIST".to_string(), "   0.0000000000000000   0.0000000000000000   0.0000000000000000       1.000000000000000
+".to_string())
+    }
+    fn misc_str(&self) -> String {
+        let options_1: String = format!(
+            "FIX_ALL_CELL : true\n\nFIX_COM : false\n{}",
+            self.write_block(("IONIC_CONSTRAINTS".to_string(), "".to_string()))
+        );
+        let external_efield = self.write_block((
+            "EXTERNAL_EFIELD".to_string(),
+            "    0.0000000000     0.0000000000     0.0000000000\n".to_string(),
+        ));
+        let external_pressure = self.write_block((
+            "EXTERNAL_PRESSURE".to_string(),
+            r#"    0.0000000000    0.0000000000    0.0000000000
+                    0.0000000000    0.0000000000
+                                    0.0000000000
+"#
+            .to_string(),
+        ));
+        let mut misc = String::new();
+        misc.push_str(&options_1);
+        misc.push_str(&external_efield);
+        misc.push_str(&external_pressure);
+        misc
+    }
+    fn species_mass_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+        let element_list = self.lattice.get_element_list();
+        let mut mass_strings = String::new();
+        element_list.iter().for_each(|elm| {
+            let mass: f64 = element_info.get(elm).unwrap().mass;
+            let mass_line: String = format!("{:>8}{:17.10}\n", elm, mass);
+            mass_strings.push_str(&mass_line);
+        });
+        ("SPECIES_MASS".to_string(), mass_strings)
+    }
+    fn species_pot_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+        let element_list = self.lattice.get_element_list();
+        let mut pot_strings = String::new();
+        element_list.iter().for_each(|elm| {
+            let pot_file: &String = &element_info.get(elm).unwrap().pot;
+            let pot_line: String = format!("{:>8}  {}\n", elm, pot_file);
+            pot_strings.push_str(&pot_line);
+        });
+        ("SPECIES_POT".to_string(), pot_strings)
+    }
+    fn species_lcao_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+        let element_list = self.lattice.get_element_list();
+        let mut lcao_strings = String::new();
+        element_list.iter().for_each(|elm| {
+            let lcao_state = &element_info.get(elm).unwrap().lcao;
+            let lcao_line: String = format!("{:>8}{:9}\n", elm, lcao_state);
+            lcao_strings.push_str(&lcao_line);
+        });
+        ("SPECIES_POT".to_string(), lcao_strings)
+    }
+    pub fn format_output(&self, element_info: &HashMap<String, Element>) -> String {
+        let mut content = String::new();
+        let block_lat_vec = self.write_block(self.lattice_vector_str());
+        content.push_str(&block_lat_vec);
+        let block_pos = self.write_block(self.positions_str(&element_info));
+        content.push_str(&block_pos);
+        let block_kpoints_list = self.write_block(self.kpoints_list_str());
+        content.push_str(&block_kpoints_list);
+        let block_misc = self.misc_str();
+        content.push_str(&block_misc);
+        let block_mass = self.write_block(self.species_mass_str(&element_info));
+        content.push_str(&block_mass);
+        let block_pot = self.write_block(self.species_pot_str(&element_info));
+        content.push_str(&block_pot);
+        let block_lcao = self.write_block(self.species_lcao_str(&element_info));
+        content.push_str(&block_lcao);
+        content
+    }
 }
 
 impl Transformation for Molecule {
     fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>) {
-        for atom in self.vector_atoms.iter_mut() {
-            let rotated_point: Point3<f64> = rotate_quatd.transform_point(atom.xyz());
-            atom.set_xyz(rotated_point);
-        }
+        self.vector_atoms
+            .iter_mut()
+            .for_each(|atom: &mut Atom| atom.set_xyz(rotate_quatd.transform_point(atom.xyz())));
     }
     fn translate(&mut self, translate_matrix: na::Translation<f64, 3>) {
-        for atom in self.vector_atoms.iter_mut() {
-            let translated_point: Point3<f64> = translate_matrix.transform_point(atom.xyz());
-            atom.set_xyz(translated_point);
-        }
+        self.vector_atoms
+            .iter_mut()
+            .for_each(|atom| atom.set_xyz(translate_matrix.transform_point(atom.xyz())));
     }
 }
 
@@ -292,7 +477,7 @@ pub fn fractional_coord_matrix(lattice: &Lattice) -> Matrix3<f64> {
         len_c * beta.cos(),
         0.0,
         len_b * gamma.sin(),
-        len_c * ((alpha) - beta.cos() * gamma.cos()) / gamma.sin(),
+        len_c * (alpha.cos() - beta.cos() * gamma.cos()) / gamma.sin(),
         0.0,
         0.0,
         vol / (len_a * len_b * gamma.sin()),
