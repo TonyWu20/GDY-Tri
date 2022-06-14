@@ -14,13 +14,13 @@ pub mod msi_parser {
         let mut atom_struct_vec: Vec<Atom> = vec![];
         for cap in atom_re.captures_iter(text) {
             let element: String = cap[2].to_string();
-            let element_id: u32 = cap[1].to_string().parse::<u32>().unwrap();
+            let element_id: u8 = cap[1].to_string().parse::<u8>().unwrap();
             let point: Point3<f64> = na::point![
                 cap[3].to_string().parse::<f64>().unwrap(),
                 cap[4].to_string().parse::<f64>().unwrap(),
                 cap[5].to_string().parse::<f64>().unwrap()
             ];
-            let atom_id: u32 = cap[6].to_string().parse::<u32>().unwrap();
+            let atom_id: u8 = cap[6].to_string().parse::<u8>().unwrap();
             atom_struct_vec.push(Atom::new(element, element_id, point, atom_id));
         }
         atom_struct_vec
@@ -47,7 +47,10 @@ pub mod msi_parser {
         Matrix3::from_columns(&lattice_vectors)
     }
     pub fn parse_lattice(filename: &str) -> Lattice {
-        let contents = read_to_string(filename).expect("Something went wrong in reading file");
+        let contents = read_to_string(filename).expect(&format!(
+            "Something went wrong in reading file {}",
+            filename
+        ));
         let mol_name: String = filename.split(".").next().unwrap().to_owned();
         let atoms: Vec<Atom> = parse_atom(&contents);
         let mol: Molecule = Molecule::new(mol_name, atoms);
