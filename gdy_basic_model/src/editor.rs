@@ -4,17 +4,13 @@ pub mod msi_editor {
         path::{Path, PathBuf},
     };
 
-    use gdy_model::{Atom, Lattice};
+    use gdy_model::{Atom, Export, Lattice};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
 
     use crate::parser::msi_parser::parse_lattice;
-    pub fn change_atom_element(
-        target_atom: &mut Atom,
-        new_element_name: &str,
-        new_element_id: u32,
-    ) {
+    pub fn change_atom_element(target_atom: &mut Atom, new_element_name: &str, new_element_id: u8) {
         target_atom.set_element_name(new_element_name);
         target_atom.set_element_id(new_element_id);
     }
@@ -28,12 +24,12 @@ pub mod msi_editor {
         for (item, dir) in metals_dirs {
             for item_b in to_use_metals.iter() {
                 let atom_1 = target_lattice.molecule.get_mut_atom_by_id(73).unwrap();
-                change_atom_element(atom_1, item.symbol, item.atomic_number);
+                change_atom_element(atom_1, item.symbol, item.atomic_number as u8);
                 let atom_2 = target_lattice.molecule.get_mut_atom_by_id(74).unwrap();
-                change_atom_element(atom_2, item.symbol, item.atomic_number);
+                change_atom_element(atom_2, item.symbol, item.atomic_number as u8);
                 let atom_3 = target_lattice.molecule.get_mut_atom_by_id(75).unwrap();
-                change_atom_element(atom_3, item_b.symbol, item_b.atomic_number);
-                let text = target_lattice.export_msi();
+                change_atom_element(atom_3, item_b.symbol, item_b.atomic_number as u8);
+                let text = target_lattice.format_output();
                 let filepath = dir.join(format!(
                     "GDY_{}_{}_{}.msi",
                     item.symbol, item.symbol, item_b.symbol
