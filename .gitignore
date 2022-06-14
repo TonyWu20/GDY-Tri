@@ -12,3 +12,6 @@ Cargo.lock
 # Generated or used files from program
 gdy_basic_model/GDY_TAC_models
 **/*.msi
+
+# System dump files
+**/.DS_Store
