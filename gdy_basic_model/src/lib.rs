@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub mod external_info;
 
 extern crate nalgebra as na;
@@ -24,7 +25,7 @@ trait Transformation {
 // trait ends
 
 // Atom
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Atom {
     element_name: String,
     element_id: u8,
@@ -147,6 +148,7 @@ impl PartialEq for Atom {
 impl Eq for Atom {}
 // End Atom
 
+#[derive(Debug, Clone)]
 pub struct Molecule {
     pub mol_name: String,
     vector_atoms: Vec<Atom>,
@@ -160,10 +162,10 @@ impl Molecule {
         }
     }
     /// Return an atom with the given id, starting from 1 (caution!)
-    pub fn get_atom_by_id(&self, atom_id: u32) -> Option<&Atom> {
+    pub fn get_atom_by_id(&self, atom_id: u8) -> Option<&Atom> {
         self.vector_atoms.get(atom_id as usize - 1)
     }
-    pub fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Option<&mut Atom> {
+    pub fn get_mut_atom_by_id(&mut self, atom_id: u8) -> Option<&mut Atom> {
         self.vector_atoms.get_mut(atom_id as usize - 1)
     }
     /// Push a new atom to the atom vectors.
@@ -177,6 +179,13 @@ impl Molecule {
     pub fn atoms_iterator(&self) -> std::slice::Iter<Atom> {
         self.vector_atoms.iter()
     }
+    pub fn get_vector_ab(&self, a_id: u8, b_id: u8) -> Vector3<f64> {
+        let atom_a: &Atom = self.get_atom_by_id(a_id).unwrap();
+        let atom_a_xyz = atom_a.xyz();
+        let atom_b: &Atom = self.get_atom_by_id(b_id).unwrap();
+        let atom_b_xyz = atom_b.xyz();
+        atom_b_xyz - atom_a_xyz
+    }
 }
 
 impl Export for Molecule {
@@ -185,6 +194,62 @@ impl Export for Molecule {
             .map(|x| x.format_output())
             .collect::<Vec<String>>()
             .join("")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Adsorbate<'a> {
+    pub molecule: &'a Molecule,
+    coord_atom_nums: u8,
+    coord_atom_ids: Vec<u8>,
+    stem_atom_ids: [u8; 2],
+    plane_atom_ids: [u8; 3],
+    vertical: bool,
+    symmetric: bool,
+    upper_atom_id: u8,
+    pathway_name: String,
+}
+
+impl<'a> Adsorbate<'a> {
+    pub fn new(
+        molecule: &'a Molecule,
+        coord_atom_nums: u8,
+        coord_atom_ids: Vec<u8>,
+        stem_atom_ids: [u8; 2],
+        plane_atom_ids: [u8; 3],
+        vertical: bool,
+        symmetric: bool,
+        upper_atom_id: u8,
+        pathway_name: String,
+    ) -> Self {
+        Self {
+            molecule,
+            coord_atom_nums,
+            coord_atom_ids,
+            stem_atom_ids,
+            plane_atom_ids,
+            vertical,
+            symmetric,
+            upper_atom_id,
+            pathway_name,
+        }
+    }
+    pub fn get_stem_vector(&self) -> Vector3<f64> {
+        self.molecule
+            .get_vector_ab(self.stem_atom_ids[0], self.stem_atom_ids[1])
+    }
+    pub fn get_plane_normal(&self) -> Vector3<f64> {
+        let ba = self
+            .molecule
+            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[1]);
+        let ca = self
+            .molecule
+            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[2]);
+        let plane_normal = ba.cross(&ca).normalize();
+        plane_normal
+    }
+    pub fn make_upright(&mut self) {
+        todo!();
     }
 }
 
@@ -264,13 +329,6 @@ impl Lattice {
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
         self.rotate(rot_quatd);
-    }
-    pub fn get_vector_ab(&self, atom_a_id: u32, atom_b_id: u32) -> Vector3<f64> {
-        let atom_a: &Atom = self.molecule.get_atom_by_id(atom_a_id).unwrap();
-        let atom_a_xyz = atom_a.xyz();
-        let atom_b: &Atom = self.molecule.get_atom_by_id(atom_b_id).unwrap();
-        let atom_b_xyz = atom_b.xyz();
-        atom_b_xyz - atom_a_xyz
     }
 }
 
