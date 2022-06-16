@@ -1,5 +1,9 @@
 #![allow(dead_code)]
+pub mod editor;
 pub mod external_info;
+pub mod param_writer;
+pub mod parser;
+pub mod test;
 
 extern crate nalgebra as na;
 
@@ -186,6 +190,9 @@ impl Molecule {
         let atom_b_xyz = atom_b.xyz();
         atom_b_xyz - atom_a_xyz
     }
+    pub fn set_molecule_name(&mut self, new_name: &str) {
+        self.mol_name = new_name.to_string();
+    }
 }
 
 impl Export for Molecule {
@@ -330,6 +337,26 @@ impl Lattice {
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
         self.rotate(rot_quatd);
     }
+    pub fn update_base_name(&mut self) {
+        // Collect all metal's symbols
+        let metal_names: Vec<String> = self
+            .metal_sites
+            .iter()
+            .map(|metal_id| -> String {
+                self.molecule
+                    .get_atom_by_id(*metal_id as u8)
+                    .unwrap()
+                    .element_name
+                    .to_string()
+            })
+            .collect::<Vec<String>>();
+        // Because we have only 3 metal elements
+        let new_name = format!(
+            "GDY_{}_{}_{}",
+            metal_names[0], metal_names[1], metal_names[2]
+        );
+        self.molecule.set_molecule_name(&new_name);
+    }
 }
 
 impl Export for Lattice {
@@ -468,7 +495,7 @@ impl<'a> Cell<'a> {
             let lcao_line: String = format!("{:>8}{:9}\n", elm, lcao_state);
             lcao_strings.push_str(&lcao_line);
         });
-        ("SPECIES_POT".to_string(), lcao_strings)
+        ("SPECIES_LCAO".to_string(), lcao_strings)
     }
     pub fn format_output(&self, element_info: &HashMap<String, Element>) -> String {
         let mut content = String::new();

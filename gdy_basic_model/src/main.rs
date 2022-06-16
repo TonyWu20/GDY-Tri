@@ -1,8 +1,5 @@
-extern crate gdy_model;
 extern crate nalgebra as na;
-mod editor;
-mod parser;
-mod test;
+use gdy_model::editor;
 fn main() {
     task_gen_all();
 }
