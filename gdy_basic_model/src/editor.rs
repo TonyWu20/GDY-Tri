@@ -35,6 +35,12 @@ pub mod msi_editor {
                 let lat_name = &target_lattice.molecule.mol_name;
                 let filepath = dir.join(format!("{}_opt/{}.msi", &lat_name, &lat_name));
                 if !filepath.exists() {
+                    let parent = filepath.parent().unwrap();
+                    if !parent.exists() {
+                        create_dir_all(&parent).unwrap_or_else(|why| {
+                            println!("! {:?}", why.kind());
+                        })
+                    }
                     fs::write(filepath, text).expect("unable to write file");
                 }
                 bar.inc(1)
