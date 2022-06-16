@@ -4,7 +4,7 @@ pub mod msi_editor {
         path::{Path, PathBuf},
     };
 
-    use gdy_model::{Atom, Export, Lattice};
+    use crate::{Atom, Export, Lattice};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
@@ -29,18 +29,16 @@ pub mod msi_editor {
                 change_atom_element(atom_2, item.symbol, item.atomic_number as u8);
                 let atom_3 = target_lattice.molecule.get_mut_atom_by_id(75).unwrap();
                 change_atom_element(atom_3, item_b.symbol, item_b.atomic_number as u8);
+                target_lattice.update_base_name();
                 let text = target_lattice.format_output();
-                let filepath = dir.join(format!(
-                    "GDY_{}_{}_{}.msi",
-                    item.symbol, item.symbol, item_b.symbol
-                ));
+                let filepath = dir.join(format!("{}.msi", target_lattice.molecule.mol_name));
                 fs::write(filepath, text).expect("unable to write file");
                 bar.inc(1);
             }
         }
         bar.finish();
     }
-    fn export_destination(element: &Element) -> PathBuf {
+    pub fn export_destination(element: &Element) -> PathBuf {
         let family: &str = match element.atomic_number {
             21..=30 => "3d",
             39..=48 => "4d",

@@ -1,9 +1,10 @@
 pub mod msi_parser {
     use std::fs::read_to_string;
 
-    use gdy_model::{Atom, Lattice, Molecule};
     use nalgebra::{Matrix3, Point3, Vector3};
     use regex::{Captures, Regex};
+
+    use crate::{Atom, Lattice, Molecule};
 
     pub fn parse_atom(text: &str) -> Vec<Atom> {
         let atom_re = Regex::new(
