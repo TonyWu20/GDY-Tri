@@ -7,6 +7,45 @@ pub mod param_writer {
     use crate::{Atom, Cell};
     use regex::Regex;
 
+    pub fn write_seed_files_for_cell(cell: &Cell, element_infotab: &HashMap<String, Element>) {
+        write_param(cell, element_infotab);
+        write_kptaux(cell);
+        write_trjaux(cell);
+        copy_potentials(cell, element_infotab);
+        copy_smcastep_extension(cell);
+    }
+
+    fn export_destination(cell: &Cell) -> PathBuf {
+        let main_metal_element: &Atom = cell
+            .lattice
+            .molecule
+            .get_atom_by_id(cell.lattice.get_metal_sites()[0 as usize] as u8)
+            .unwrap();
+        let family = match main_metal_element.element_id() {
+            21..=30 => "3d",
+            39..=48 => "4d",
+            72..=80 => "5d",
+            57..=71 => "rare_earth",
+            _ => "else",
+        };
+        let dir_path = format!(
+            "./GDY_TAC_models/{}/{}/{}_opt",
+            family,
+            main_metal_element.element_name(),
+            cell.lattice.molecule.mol_name
+        );
+        create_dir_all(&dir_path).unwrap_or_else(|why| {
+            println!("! {:?}", why.kind());
+        });
+        Path::new(&dir_path).to_path_buf()
+    }
+
+    fn export_filepath(cell: &Cell, filename: &str) -> PathBuf {
+        let export_dest = export_destination(cell);
+        let export_filename = format!("{}{}", cell.lattice.molecule.mol_name, filename);
+        export_dest.join(export_filename)
+    }
+
     fn get_final_cutoff_energy(cell: &Cell, element_infotab: &HashMap<String, Element>) -> f64 {
         let mut energy: f64 = 0.0;
         let element_lists = cell.lattice.get_element_list();
@@ -83,32 +122,7 @@ pdos_calculate_weights : true
 bs_write_eigenvalues : true
 "#
         );
-        let export_destination = |cell: &Cell| -> PathBuf {
-            let main_metal_element: &Atom = cell
-                .lattice
-                .molecule
-                .get_atom_by_id(cell.lattice.get_metal_sites()[0 as usize] as u8)
-                .unwrap();
-            let family = match main_metal_element.element_id() {
-                21..=30 => "3d",
-                39..=48 => "4d",
-                72..=80 => "5d",
-                57..=71 => "rare_earth",
-                _ => "else",
-            };
-            let dir_path = format!(
-                "./GDY_TAC_models/{}/{}",
-                family,
-                main_metal_element.element_name()
-            );
-            create_dir_all(&dir_path).unwrap_or_else(|why| {
-                println!("! {:?}", why.kind());
-            });
-            Path::new(&dir_path).to_path_buf()
-        };
-        let param_write_dest = export_destination(cell);
-        let geom_param_filename = format!("{}.param", cell.lattice.molecule.mol_name);
-        let geom_param_path = param_write_dest.join(&geom_param_filename);
+        let geom_param_path = export_filepath(cell, ".param");
         fs::write(geom_param_path, geom_param_content).expect(&format!(
             "Unable to write geom param for {}",
             cell.lattice.molecule.mol_name
@@ -152,11 +166,65 @@ pdos_calculate_weights : true
 bs_write_eigenvalues : true
 "#
         );
-        let dos_param_filename = format!("{}_DOS.param", cell.lattice.molecule.mol_name);
-        let dos_param_path = param_write_dest.join(&dos_param_filename);
+        let dos_param_path = export_filepath(cell, "_DOS.param");
         fs::write(dos_param_path, dos_param_content).expect(&format!(
             "Unable to write dos param for {}",
             cell.lattice.molecule.mol_name
         ));
+    }
+    fn write_kptaux(cell: &Cell) {
+        let kptaux_contents = r#"MP_GRID :        1       1       1
+MP_OFFSET :   0.000000000000000e+000  
+0.000000000000000e+000  0.000000000000000e+000
+%BLOCK KPOINT_IMAGES
+   1   1
+%ENDBLOCK KPOINT_IMAGES"#
+            .to_string();
+        let kptaux_path = export_filepath(cell, ".kptaux");
+        fs::write(kptaux_path, &kptaux_contents).expect(&format!(
+            "Unable to write kptaux for {}",
+            cell.lattice.molecule.mol_name
+        ));
+        let kptaux_dos_path = export_filepath(cell, "_DOS.kptaux");
+        fs::write(kptaux_dos_path, &kptaux_contents).expect(&format!(
+            "Unable to write dos_kptaux for {}",
+            cell.lattice.molecule.mol_name
+        ));
+    }
+    fn write_trjaux(cell: &Cell) {
+        let trjaux_path = export_filepath(cell, ".trjaux");
+        let mut trjaux_contents = String::new();
+        let trjaux_header = r#"# Atom IDs to appear in any .trj file to be generated.
+# Correspond to atom IDs which will be used in exported .msi file
+# required for animation/analysis of trajectory within Cerius2.
+"#;
+        trjaux_contents.push_str(trjaux_header);
+        cell.lattice.molecule.atoms_iterator().for_each(|atom| {
+            trjaux_contents.push_str(&format!("{}\n", atom.atom_id()));
+        });
+        let trjaux_ending =
+            r#"#Origin  0.000000000000000e+000  0.000000000000000e+000  0.000000000000000e+000"#;
+        trjaux_contents.push_str(trjaux_ending);
+        fs::write(trjaux_path, trjaux_contents).expect(&format!(
+            "Unable to write trjaux for {}",
+            cell.lattice.molecule.mol_name
+        ));
+    }
+    fn copy_potentials(cell: &Cell, element_infotab: &HashMap<String, Element>) {
+        let target_dir = export_destination(cell);
+        cell.lattice.get_element_list().iter().for_each(|elm| {
+            let pot_file = &element_infotab.get(elm).unwrap().pot;
+            let original_file = format!("./resources/Potentials/{}", pot_file);
+            let original_path = Path::new(&original_file);
+            let dest_path = target_dir.join(pot_file);
+            fs::copy(original_path, dest_path).expect("Error in copying potential file!");
+        });
+    }
+    fn copy_smcastep_extension(cell: &Cell) {
+        let target_dir = export_destination(cell);
+        let target_filename = format!("SMCastep_Extension_{}.xms", cell.lattice.molecule.mol_name);
+        let target_path = target_dir.join(target_filename);
+        fs::copy("./resources/SMCastep_Extension.xms", target_path)
+            .expect("Error in copying SMCastep_Extension.xms!");
     }
 }
