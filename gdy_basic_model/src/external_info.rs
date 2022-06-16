@@ -21,7 +21,7 @@ pub mod element_table {
     }
 
     pub fn load_table() -> Result<ElmInfo, serde_yaml::Error> {
-        let yaml_table = fs::File::open("/Users/tonywu/Library/Mobile Documents/com~apple~CloudDocs/Programming/GDY-Tri/gdy_basic_model/resources/element_table.yaml")
+        let yaml_table = fs::File::open("./resources/element_table.yaml")
             .expect("Something wrong in reading element_table.yaml");
         let table: ElmInfo = serde_yaml::from_reader(yaml_table)?;
         Ok(table)
