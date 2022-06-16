@@ -13,3 +13,5 @@ edition = "2021"
  indicatif = "0"
  serde_yaml = "0.8.*"
  serde = {version= "*", features=["derive"]}
+ rayon = "*"
+ glob = "0"
