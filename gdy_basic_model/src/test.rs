@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod test {
+    use crate::param_writer::param_writer::write_seed_files_for_cell;
     use crate::{external_info::element_table, param_writer::param_writer::write_param, *};
 
     use crate::{editor::msi_editor::change_atom_element, parser};
@@ -73,6 +74,6 @@ mod test {
         base_lat.update_base_name();
         let cell = Cell::new(&mut base_lat, false);
         let element_info = element_table::hash_table();
-        write_param(&cell, &element_info);
+        write_seed_files_for_cell(&cell, &element_info);
     }
 }
