@@ -1,7 +1,12 @@
 #[cfg(test)]
 mod test {
-    use crate::param_writer::param_writer::write_seed_files_for_cell;
+    use crate::param_writer::param_writer::{export_destination, write_seed_files_for_cell};
+    use crate::parser::msi_parser::parse_lattice;
     use crate::{external_info::element_table, param_writer::param_writer::write_param, *};
+    use glob::glob;
+    use rayon::iter::{
+        IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+    };
 
     use crate::{editor::msi_editor::change_atom_element, parser};
 
@@ -75,5 +80,25 @@ mod test {
         let cell = Cell::new(&mut base_lat, false);
         let element_info = element_table::hash_table();
         write_seed_files_for_cell(&cell, &element_info);
+    }
+    #[test]
+    fn test_glob() {
+        let root_dir = "GDY_TAC_models";
+        let msi_pattern = format!("{root_dir}/**/*.msi");
+        glob(&msi_pattern)
+            .expect("Failed to read glob pattern")
+            .into_iter()
+            .par_bridge()
+            .collect::<Vec<_>>()
+            .par_iter()
+            .for_each(|entry| match entry {
+                Ok(path) => {
+                    println!("{}", path.to_str().unwrap());
+                    let mut lattice = parse_lattice(path.to_str().unwrap());
+                    let cell = Cell::new(&mut lattice, false);
+                    println!("{}", export_destination(&cell).to_str().unwrap());
+                }
+                Err(e) => println!("{:?}", e),
+            });
     }
 }

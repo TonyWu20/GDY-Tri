@@ -4,7 +4,8 @@ pub mod msi_editor {
         path::{Path, PathBuf},
     };
 
-    use crate::{Atom, Export, Lattice};
+    use crate::Lattice;
+    use crate::{Atom, Export};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
@@ -19,7 +20,7 @@ pub mod msi_editor {
         for metal in to_use_metals.iter() {
             export_dirs.push(export_destination(metal));
         }
-        let metals_dirs = std::iter::zip(to_use_metals, export_dirs);
+        let metals_dirs = to_use_metals.iter().zip(export_dirs);
         let bar = ProgressBar::new((to_use_metals.len().pow(2)) as u64);
         for (item, dir) in metals_dirs {
             for item_b in to_use_metals.iter() {
@@ -31,9 +32,12 @@ pub mod msi_editor {
                 change_atom_element(atom_3, item_b.symbol, item_b.atomic_number as u8);
                 target_lattice.update_base_name();
                 let text = target_lattice.format_output();
-                let filepath = dir.join(format!("{}.msi", target_lattice.molecule.mol_name));
-                fs::write(filepath, text).expect("unable to write file");
-                bar.inc(1);
+                let lat_name = &target_lattice.molecule.mol_name;
+                let filepath = dir.join(format!("{}_opt/{}.msi", &lat_name, &lat_name));
+                if !filepath.exists() {
+                    fs::write(filepath, text).expect("unable to write file");
+                }
+                bar.inc(1)
             }
         }
         bar.finish();
