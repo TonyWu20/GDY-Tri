@@ -9,4 +9,5 @@ fn task_gen_all() {
     editor::msi_editor::generate_all_base_models("./resources/GDY_tri.msi");
     println!("Generate all seed files for base models");
     param_writer::param_writer::generate_all_seed_files("GDY_TAC_models");
+    param_writer::param_writer::to_xsd_scripts("GDY_TAC_models");
 }
