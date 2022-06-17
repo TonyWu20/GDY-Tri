@@ -87,13 +87,17 @@ use MaterialsScript qw(:all);
         write_param(cell, element_infotab);
         write_kptaux(cell);
         write_trjaux(cell);
+        #[cfg(not(debug_assertions))]
         copy_potentials(cell, element_infotab);
+
         copy_smcastep_extension(cell);
+        // Currently asked for lsf
+        write_lsf_script(cell);
         let export_dir = export_destination(cell);
         let msi_path = export_dir
             .parent()
             .unwrap()
-            .join(&format!("{}.msi", cell.lattice.molecule.mol_name));
+            .join(&format!("{}.msi", cell.get_cell_name()));
         let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
         if moved_dest.exists() == false {
             fs::rename(&msi_path, moved_dest).expect("Move msi file failed!");
@@ -117,7 +121,7 @@ use MaterialsScript qw(:all);
             "GDY_TAC_models/{}/{}/{}_opt",
             family,
             main_metal_element.element_name(),
-            cell.lattice.molecule.mol_name
+            cell.get_cell_name()
         );
         create_dir_all(&dir_path).unwrap_or_else(|why| {
             println!("! {:?}", why.kind());
@@ -127,7 +131,7 @@ use MaterialsScript qw(:all);
 
     fn export_filepath(cell: &Cell, filename: &str) -> PathBuf {
         let export_dest = export_destination(cell);
-        let export_filename = format!("{}{}", cell.lattice.molecule.mol_name, filename);
+        let export_filename = format!("{}{}", cell.get_cell_name(), filename);
         export_dest.join(export_filename)
     }
 
@@ -268,7 +272,7 @@ bs_write_eigenvalues : true
             );
             fs::write(dos_param_path, dos_param_content).expect(&format!(
                 "Unable to write dos param for {}",
-                cell.lattice.molecule.mol_name
+                cell.get_cell_name()
             ));
         }
     }
@@ -284,14 +288,14 @@ MP_OFFSET :   0.000000000000000e+000
         if !kptaux_path.exists() {
             fs::write(kptaux_path, &kptaux_contents).expect(&format!(
                 "Unable to write kptaux for {}",
-                cell.lattice.molecule.mol_name
+                cell.get_cell_name()
             ));
         }
         let kptaux_dos_path = export_filepath(cell, "_DOS.kptaux");
         if !kptaux_dos_path.exists() {
             fs::write(kptaux_dos_path, &kptaux_contents).expect(&format!(
                 "Unable to write dos_kptaux for {}",
-                cell.lattice.molecule.mol_name
+                cell.get_cell_name()
             ));
         }
     }
@@ -311,7 +315,7 @@ MP_OFFSET :   0.000000000000000e+000
             trjaux_contents.push_str(trjaux_ending);
             fs::write(trjaux_path, trjaux_contents).expect(&format!(
                 "Unable to write trjaux for {}",
-                cell.lattice.molecule.mol_name
+                cell.get_cell_name()
             ));
         }
     }
@@ -329,11 +333,29 @@ MP_OFFSET :   0.000000000000000e+000
     }
     fn copy_smcastep_extension(cell: &Cell) {
         let target_dir = export_destination(cell);
-        let target_filename = format!("SMCastep_Extension_{}.xms", cell.lattice.molecule.mol_name);
+        let target_filename = format!("SMCastep_Extension_{}.xms", cell.get_cell_name());
         let target_path = target_dir.join(target_filename);
         if !target_path.exists() {
             fs::copy("./resources/SMCastep_Extension.xms", target_path)
                 .expect("Error in copying SMCastep_Extension.xms!");
         }
     }
+    fn write_lsf_script(cell: &Cell) {
+        let target_dir = export_destination(cell);
+        let cell_name = cell.get_cell_name();
+        let cmd = format!("/home-yw/Soft/msi/MS70/MaterialsStudio7.0/etc/CASTEP/bin/RunCASTEP.sh -np $NP {cell_name}");
+        let prefix = r#"APP_NAME=intelY_mid
+NP=12
+NP_PER_NODE=12
+OMP_NUM_THREADS=1
+RUN="RAW
+"#;
+        let content = format!("{prefix}{cmd}");
+        let lsf_filepath = target_dir.join("MS70_YW_CASTEP.lsf");
+        fs::write(lsf_filepath, content).expect("Failed to write lsf scripts");
+    }
+    // For future need
+    // fn write_pbs_script(cell: &Cell) {
+    // todo!("Write .pbs script");
+    // }
 }
