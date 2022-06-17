@@ -38,12 +38,6 @@ pub mod param_writer {
         bar.finish();
     }
     pub fn to_xsd_scripts(root_dir: &str) {
-        let runtime_root = Path::new("./")
-            .canonicalize()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
         let msi_pattern = format!("{root_dir}/**/*.msi");
         let item_collection = glob(&msi_pattern)
             .expect("Failed to read glob pattern")
