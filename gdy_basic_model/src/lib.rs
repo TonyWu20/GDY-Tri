@@ -392,6 +392,9 @@ impl<'a> Cell<'a> {
         self.lattice.molecule.vector_atoms.sort();
         self.sorted = true;
     }
+    pub fn get_cell_name(&self) -> String {
+        self.lattice.molecule.mol_name.to_string()
+    }
     // Accept tuple which has name + content
     fn write_block(&self, block: (String, String)) -> String {
         let (block_name, content) = block;
