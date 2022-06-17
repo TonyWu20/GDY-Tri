@@ -33,9 +33,60 @@ pub mod param_writer {
                     write_seed_files_for_cell(&cell, &element_infotab);
                     bar.inc(1);
                 }
-                Err(e) => println!("{:?}", e),
+                Err(e) => println!("glob entry match error: {:?}", e),
             });
         bar.finish();
+    }
+    pub fn to_xsd_scripts(root_dir: &str) {
+        let runtime_root = Path::new("./")
+            .canonicalize()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let msi_pattern = format!("{root_dir}/**/*.msi");
+        let item_collection = glob(&msi_pattern)
+            .expect("Failed to read glob pattern")
+            .into_iter()
+            .par_bridge()
+            .into_par_iter()
+            .map(|entry| -> Option<String> {
+                match entry {
+                    Ok(path) => {
+                        let stem = path.file_stem().unwrap();
+                        let parent = path.parent().unwrap();
+                        Some(format!(
+                            r#""{}/{}""#,
+                            parent.to_str().unwrap(),
+                            stem.to_str().unwrap()
+                        ))
+                    }
+                    Err(e) => {
+                        println!("glob entry match error: {:?}", e);
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<Option<String>>>()
+            .iter()
+            .map(|entry| -> String { entry.as_ref().unwrap().to_string() })
+            .collect::<Vec<String>>();
+        let all_files_text = item_collection.join(", ");
+        let headlines = r#"#!perl
+use strict;
+use Getopt::Long;
+use MaterialsScript qw(:all);
+"#;
+        let array_text = format!("my @params = (\n{});\n", all_files_text);
+        let actions = r#"foreach my $item (@params) {
+    my $doc = $Documents{"${item}.msi"};
+    $doc->CalculateBonds;
+    $doc->Export("${item}.xsd");
+    $doc->Save;
+    $doc->Close;
+}"#;
+        let contents = format!("{headlines}{array_text}{actions}");
+        fs::write(Path::new("msi_to_xsd.pl"), contents).expect("Failed writing msi_to_xsd.pl");
     }
 
     pub fn write_seed_files_for_cell(cell: &Cell, element_infotab: &HashMap<String, Element>) {
