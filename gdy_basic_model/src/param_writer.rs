@@ -84,6 +84,9 @@ use MaterialsScript qw(:all);
     }
 
     pub fn write_seed_files_for_cell(cell: &Cell, element_infotab: &HashMap<String, Element>) {
+        let cell_output = cell.format_output(element_infotab);
+        let cell_path = export_filepath(cell, ".cell");
+        fs::write(cell_path, cell_output).expect("Failed to write .cell file!");
         write_param(cell, element_infotab);
         write_kptaux(cell);
         write_trjaux(cell);
