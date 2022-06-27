@@ -399,7 +399,7 @@ impl<'a> Cell<'a> {
     fn write_block(&self, block: (String, String)) -> String {
         let (block_name, content) = block;
         format!(
-            "%%BlOCK {}\n{}%%ENDBLOCK {}\n\n",
+            "%BlOCK {}\n{}%ENDBLOCK {}\n\n",
             block_name, content, block_name
         )
     }
