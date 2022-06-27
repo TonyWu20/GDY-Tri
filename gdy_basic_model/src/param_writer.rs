@@ -159,7 +159,14 @@ use MaterialsScript qw(:all);
                 .as_str()
                 .parse::<u32>()
                 .expect("Error in parsing fine cutoff energy as u32");
-            let ultra_fine_energy = ((fine_cutoff_energy / 10 + 1) * 10) as f64;
+            let _ultra_fine = fine_cutoff_energy as f64 * 1.1; // Correct conversion
+            let round_bigger_tenth = |num: u32| -> f64 {
+                match num % 10 {
+                    0 => num as f64,
+                    _ => ((num / 10 + 1) * 10) as f64,
+                }
+            };
+            let ultra_fine_energy = round_bigger_tenth(_ultra_fine as u32);
             energy = if energy > ultra_fine_energy {
                 energy
             } else {
@@ -181,15 +188,15 @@ use MaterialsScript qw(:all);
                 .reduce(|total, i| total + i)
                 .unwrap();
             let geom_param_content = format!(
-                r#"task : BandStructure
-continuation : default
+                r#"
+task : GeometryOptimization
 comment : CASTEP calculation from Materials Studio
 xc_functional : PBE
 spin_polarized : true
 spin :        {spin_total}
 opt_strategy : Speed
 page_wvfns :        0
-cut_off_energy : {cutoff_energy:18.15}
+cut_off_energy :      {cutoff_energy:18.15}
 grid_scale :        1.500000000000000
 fine_grid_scale :        1.500000000000000
 finite_basis_corr :        0
@@ -203,20 +210,24 @@ mix_spin_amp :        2.000000000000000
 mix_charge_gmax :        1.500000000000000
 mix_spin_gmax :        1.500000000000000
 mix_history_length :       20
-perc_extra_bands :      72
+perc_extra_bands : 72
 smearing_width :        0.100000000000000
 spin_fix :        6
 num_dump_cycles : 0
-bs_nextra_bands :       72
-bs_xc_functional : PBE
-bs_eigenvalue_tol :   1.000000000000000e-005
-calculate_stress : false
+geom_energy_tol :   5.000000000000000e-005
+geom_force_tol :        0.100000000000000
+geom_stress_tol :        0.200000000000000
+geom_disp_tol :        0.005000000000000
+geom_max_iter :     6000
+geom_method : BFGS
+fixed_npw : false
 calculate_ELF : false
-popn_calculate : false
-calculate_hirshfeld : false
+calculate_stress : false
+popn_calculate : true
+calculate_hirshfeld : true
 calculate_densdiff : false
+popn_bond_cutoff :        3.000000000000000
 pdos_calculate_weights : true
-bs_write_eigenvalues : true
 "#
             );
             fs::write(&geom_param_path, geom_param_content).expect(&format!(
