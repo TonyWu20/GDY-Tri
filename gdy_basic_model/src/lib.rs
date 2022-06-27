@@ -386,6 +386,7 @@ pub struct Cell<'a> {
 
 impl<'a> Cell<'a> {
     pub fn new(lattice: &'a mut Lattice, sorted: bool) -> Self {
+        lattice.rotate_to_standard_orientation();
         Self { lattice, sorted }
     }
     pub fn sort_atoms_by_elements(&mut self) {
