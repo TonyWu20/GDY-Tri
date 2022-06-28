@@ -4,8 +4,8 @@ pub mod msi_editor {
         path::{Path, PathBuf},
     };
 
-    use crate::Lattice;
-    use crate::{Atom, Export};
+    use crate::lattice::Lattice;
+    use crate::{atom::Atom, Export};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;

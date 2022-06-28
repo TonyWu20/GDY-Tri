@@ -4,7 +4,7 @@ pub mod msi_parser {
     use nalgebra::{Matrix3, Point3, Vector3};
     use regex::{Captures, Regex};
 
-    use crate::{Atom, Lattice, Molecule};
+    use crate::{atom::Atom, lattice::Lattice, molecule::Molecule};
 
     pub fn parse_atom(text: &str) -> Vec<Atom> {
         let atom_re = Regex::new(

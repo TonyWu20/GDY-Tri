@@ -6,7 +6,7 @@ pub mod param_writer {
 
     use crate::external_info::element_table::{self, Element};
     use crate::parser::msi_parser::parse_lattice;
-    use crate::{Atom, Cell};
+    use crate::{atom::Atom, cell::Cell};
     use glob::glob;
     use rayon::prelude::*;
     use regex::Regex;

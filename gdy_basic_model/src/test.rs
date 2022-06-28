@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod test {
+    use crate::cell::Cell;
+    use crate::lattice::Lattice;
     use crate::param_writer::param_writer::{export_destination, write_seed_files_for_cell};
     use crate::parser::msi_parser::parse_lattice;
-    use crate::{external_info::element_table, param_writer::param_writer::write_param, *};
+    use crate::{external_info::element_table, *};
     use glob::glob;
-    use rayon::iter::{
-        IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
-    };
+    use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
     use crate::{editor::msi_editor::change_atom_element, parser};
 
