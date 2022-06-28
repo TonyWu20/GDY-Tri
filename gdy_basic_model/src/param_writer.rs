@@ -188,8 +188,7 @@ use MaterialsScript qw(:all);
                 .reduce(|total, i| total + i)
                 .unwrap();
             let geom_param_content = format!(
-                r#"
-task : GeometryOptimization
+                r#"task : GeometryOptimization
 comment : CASTEP calculation from Materials Studio
 xc_functional : PBE
 spin_polarized : true
@@ -362,7 +361,8 @@ MP_OFFSET :   0.000000000000000e+000
 NP=12
 NP_PER_NODE=12
 OMP_NUM_THREADS=1
-RUN="RAW
+RUN="RAW"
+
 "#;
         let content = format!("{prefix}{cmd}");
         let lsf_filepath = target_dir.join("MS70_YW_CASTEP.lsf");

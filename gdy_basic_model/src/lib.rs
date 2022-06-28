@@ -499,7 +499,7 @@ impl<'a> Cell<'a> {
             let lcao_line: String = format!("{:>8}{:9}\n", elm, lcao_state);
             lcao_strings.push_str(&lcao_line);
         });
-        ("SPECIES_LCAO".to_string(), lcao_strings)
+        ("SPECIES_LCAO_STATES".to_string(), lcao_strings)
     }
     pub fn format_output(&self, element_info: &HashMap<String, Element>) -> String {
         let mut content = String::new();
