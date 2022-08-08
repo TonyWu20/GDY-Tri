@@ -1,14 +1,2 @@
-[package]
-name = "gdy_data_visualization"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-polars = "0"
-polars-lazy = { version = "0", features = ["regex"] }
-ndarray = "0"
-castepbin-rust = { git = "https://github.com/TonyWu20/castepbin-rust" }
-toml = "0"
-serde = { version = "1.0", features = ["derive"] }
+[workspace]
+members = ["gdy_visualize", "config_parser", "data_process"]

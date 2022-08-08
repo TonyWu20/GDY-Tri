@@ -18,5 +18,5 @@ impl MyOutput for &str {
 }
 
 pub trait ExportGnuData {
-    fn to_gnu_data<P: AsRef<Path>>(&self, filename: P) -> Result<(), Error>;
+    fn to_gnu_data<P: AsRef<Path>>(&self, filename: P, mode: &str) -> Result<(), Error>;
 }
