@@ -85,9 +85,7 @@ impl Sites {
             .iter()
             .zip(self.site_names())
             .for_each(|(site_name, sites)| {
-                hash_map
-                    .insert(site_name.to_string(), sites.clone())
-                    .unwrap();
+                hash_map.insert(site_name.to_string(), sites.clone());
             });
         Ok(hash_map)
     }
@@ -101,6 +99,13 @@ pub struct AdsorbatesMap {
 impl AdsorbatesMap {
     pub fn adsorbates(&self) -> &[Adsorbate] {
         self.adsorbates.as_ref()
+    }
+    pub fn ads_name_site_hashmap(&self) -> HashMap<String, String> {
+        let mut hash_map: HashMap<String, String> = HashMap::new();
+        self.adsorbates.iter().for_each(|ads| {
+            hash_map.insert(ads.name().to_owned(), ads.sites().to_owned());
+        });
+        hash_map
     }
 }
 
@@ -153,6 +158,20 @@ fn test_read_config() {
 
     let config_text = fs::read_to_string("../config.toml").unwrap();
     let config: Result<EnergyConfig, toml::de::Error> = toml::from_str(&config_text);
-    // assert!(config.is_ok());
-    println!("{:?}", config.unwrap());
+    assert!(config.is_ok());
+    let pathways = config.as_ref().unwrap().pathways();
+    let ads_hashmap = config
+        .as_ref()
+        .unwrap()
+        .adsorbates()
+        .ads_name_site_hashmap();
+    pathways.item().iter().for_each(|pathway| {
+        pathway.path().iter().for_each(|item| {
+            println!(
+                "ads: {}, site series: {}",
+                item,
+                ads_hashmap.get(item).unwrap()
+            )
+        })
+    })
 }
