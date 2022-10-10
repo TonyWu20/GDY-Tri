@@ -1,85 +1,41 @@
-use na::Vector3;
+use std::f64::consts::PI;
 
-use crate::{atom::Atom, Export, Transformation};
+use na::{vector, Unit, UnitQuaternion, Vector3};
+
+use crate::{
+    atom::{Atom, AtomArray},
+    Export, Transformation,
+};
 #[derive(Debug, Clone)]
-pub struct Molecule {
-    pub mol_name: String,
-    pub vector_atoms: Vec<Atom>,
-}
-
-impl Molecule {
-    pub fn new(mol_name: String, vector_atoms: Vec<Atom>) -> Self {
-        Self {
-            mol_name,
-            vector_atoms,
-        }
-    }
-    /// Return an atom with the given id, starting from 1 (caution!)
-    pub fn get_atom_by_id(&self, atom_id: u8) -> Option<&Atom> {
-        self.vector_atoms.get(atom_id as usize - 1)
-    }
-    pub fn get_mut_atom_by_id(&mut self, atom_id: u8) -> Option<&mut Atom> {
-        self.vector_atoms.get_mut(atom_id as usize - 1)
-    }
-    /// Push a new atom to the atom vectors.
-    pub fn append_atom(&mut self, new_atom: Atom) {
-        self.vector_atoms.push(new_atom);
-    }
-    /// Return the current number of atoms of the molecule.
-    pub fn number_of_atoms(&self) -> usize {
-        self.vector_atoms.len()
-    }
-    pub fn atoms_iterator(&self) -> std::slice::Iter<Atom> {
-        self.vector_atoms.iter()
-    }
-    pub fn get_vector_ab(&self, a_id: u8, b_id: u8) -> Vector3<f64> {
-        let atom_a: &Atom = self.get_atom_by_id(a_id).unwrap();
-        let atom_a_xyz = atom_a.xyz();
-        let atom_b: &Atom = self.get_atom_by_id(b_id).unwrap();
-        let atom_b_xyz = atom_b.xyz();
-        atom_b_xyz - atom_a_xyz
-    }
-    pub fn set_molecule_name(&mut self, new_name: &str) {
-        self.mol_name = new_name.to_string();
-    }
-}
-
-impl Export for Molecule {
-    fn format_output(&self) -> String {
-        self.atoms_iterator()
-            .map(|x| x.format_output())
-            .collect::<Vec<String>>()
-            .join("")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Adsorbate<'a> {
-    pub molecule: &'a Molecule,
-    coord_atom_nums: u8,
-    coord_atom_ids: Vec<u8>,
-    stem_atom_ids: [u8; 2],
-    plane_atom_ids: [u8; 3],
+pub struct Adsorbate {
+    mol_name: String,
+    atoms_vec: Vec<Atom>,
+    coord_atom_nums: u32,
+    coord_atom_ids: Vec<u32>,
+    stem_atom_ids: [u32; 2],
+    plane_atom_ids: [u32; 3],
     vertical: bool,
     symmetric: bool,
-    upper_atom_id: u8,
+    upper_atom_id: u32,
     pathway_name: String,
 }
 
-impl<'a> Adsorbate<'a> {
+impl Adsorbate {
     pub fn new(
-        molecule: &'a Molecule,
-        coord_atom_nums: u8,
-        coord_atom_ids: Vec<u8>,
-        stem_atom_ids: [u8; 2],
-        plane_atom_ids: [u8; 3],
+        mol_name: String,
+        atoms_vec: Vec<Atom>,
+        coord_atom_nums: u32,
+        coord_atom_ids: Vec<u32>,
+        stem_atom_ids: [u32; 2],
+        plane_atom_ids: [u32; 3],
         vertical: bool,
         symmetric: bool,
-        upper_atom_id: u8,
+        upper_atom_id: u32,
         pathway_name: String,
     ) -> Self {
         Self {
-            molecule,
+            mol_name,
+            atoms_vec,
             coord_atom_nums,
             coord_atom_ids,
             stem_atom_ids,
@@ -90,33 +46,65 @@ impl<'a> Adsorbate<'a> {
             pathway_name,
         }
     }
-    pub fn get_stem_vector(&self) -> Vector3<f64> {
-        self.molecule
+
+    pub fn set_adsorate_name(&mut self, new_name: &str) {
+        self.mol_name = new_name.to_string();
+    }
+    pub fn get_stem_vector(&self) -> Result<Vector3<f64>, String> {
+        self.atoms_vec
             .get_vector_ab(self.stem_atom_ids[0], self.stem_atom_ids[1])
     }
-    pub fn get_plane_normal(&self) -> Vector3<f64> {
+    pub fn get_plane_normal(&self) -> Result<Vector3<f64>, String> {
         let ba = self
-            .molecule
-            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[1]);
+            .atoms_vec
+            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[1])?;
         let ca = self
-            .molecule
-            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[2]);
+            .atoms_vec
+            .get_vector_ab(self.plane_atom_ids[0], self.plane_atom_ids[2])?;
         let plane_normal = ba.cross(&ca).normalize();
-        plane_normal
+        Ok(plane_normal)
     }
     pub fn make_upright(&mut self) {
+        let stem_vector: Vector3<f64> = self
+            .get_stem_vector()
+            .unwrap_or_else(|_| panic!("Failed to get stem vector! Adsorbate: {}", self.mol_name));
+        if self.vertical {
+            let plane_normal: Vector3<f64> = self.get_plane_normal().unwrap_or_else(|_| {
+                panic!("Failed to get plane normal! Adsorbate: {}", self.mol_name)
+            });
+            let plane_normal_xy_proj: Vector3<f64> = vector![plane_normal[0], plane_normal[1], 0.0];
+            let rotate_angle = plane_normal.angle(&plane_normal_xy_proj);
+            let rot_axis = plane_normal.cross(&plane_normal_xy_proj);
+            let rot_axis_stem_angle = rot_axis.angle(&stem_vector);
+            let rotation_quaternion = if rot_axis_stem_angle < PI / 2.0 {
+                UnitQuaternion::from_axis_angle(&Unit::new_normalize(stem_vector), rotate_angle)
+            } else {
+                UnitQuaternion::from_axis_angle(
+                    &Unit::new_normalize(stem_vector.scale(-1.0)),
+                    rotate_angle,
+                )
+            };
+            self.atoms_vec.rotate(rotation_quaternion);
+        }
         todo!();
     }
 }
-impl Transformation for Molecule {
+
+impl Export for Adsorbate {
+    fn format_output(&self) -> String {
+        self.atoms_vec
+            .iter()
+            .map(|x| x.format_output())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+}
+
+impl Transformation for Adsorbate {
     fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>) {
-        self.vector_atoms
-            .iter_mut()
-            .for_each(|atom: &mut Atom| atom.set_xyz(rotate_quatd.transform_point(atom.xyz())));
+        self.atoms_vec.rotate(rotate_quatd)
     }
     fn translate(&mut self, translate_matrix: na::Translation<f64, 3>) {
-        self.vector_atoms
-            .iter_mut()
-            .for_each(|atom| atom.set_xyz(translate_matrix.transform_point(atom.xyz())));
+        self.atoms_vec.translate(translate_matrix)
     }
 }

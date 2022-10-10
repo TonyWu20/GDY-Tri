@@ -4,14 +4,18 @@ pub mod msi_editor {
         path::{Path, PathBuf},
     };
 
-    use crate::lattice::Lattice;
     use crate::{atom::Atom, Export};
+    use crate::{atom::AtomArray, lattice::Lattice};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
 
     use crate::parser::msi_parser::parse_lattice;
-    pub fn change_atom_element(target_atom: &mut Atom, new_element_name: &str, new_element_id: u8) {
+    pub fn change_atom_element(
+        target_atom: &mut Atom,
+        new_element_name: &str,
+        new_element_id: u32,
+    ) {
         target_atom.set_element_name(new_element_name);
         target_atom.set_element_id(new_element_id);
     }
@@ -24,15 +28,24 @@ pub mod msi_editor {
         let bar = ProgressBar::new((to_use_metals.len().pow(2)) as u64);
         for (item, dir) in metals_dirs {
             for item_b in to_use_metals.iter() {
-                let atom_1 = target_lattice.molecule.get_mut_atom_by_id(73).unwrap();
-                change_atom_element(atom_1, item.symbol, item.atomic_number as u8);
-                let atom_2 = target_lattice.molecule.get_mut_atom_by_id(74).unwrap();
-                change_atom_element(atom_2, item.symbol, item.atomic_number as u8);
-                let atom_3 = target_lattice.molecule.get_mut_atom_by_id(75).unwrap();
-                change_atom_element(atom_3, item_b.symbol, item_b.atomic_number as u8);
+                let atom_1 = target_lattice
+                    .atoms_vec_mut()
+                    .get_mut_atom_by_id(73)
+                    .unwrap();
+                change_atom_element(atom_1, item.symbol, item.atomic_number);
+                let atom_2 = target_lattice
+                    .atoms_vec_mut()
+                    .get_mut_atom_by_id(74)
+                    .unwrap();
+                change_atom_element(atom_2, item.symbol, item.atomic_number);
+                let atom_3 = target_lattice
+                    .atoms_vec_mut()
+                    .get_mut_atom_by_id(75)
+                    .unwrap();
+                change_atom_element(atom_3, item_b.symbol, item_b.atomic_number);
                 target_lattice.update_base_name();
                 let text = target_lattice.format_output();
-                let lat_name = &target_lattice.molecule.mol_name;
+                let lat_name = target_lattice.lattice_name();
                 let filepath = dir.join(format!("{}_opt/{}.msi", &lat_name, &lat_name));
                 if !filepath.exists() {
                     let parent = filepath.parent().unwrap();

@@ -1,12 +1,15 @@
 pub mod param_writer {
     use indicatif::ProgressBar;
+    use std::error::Error;
     use std::fs::{self, create_dir_all};
     use std::path::{Path, PathBuf};
     use std::{collections::HashMap, fs::read_to_string};
 
+    use crate::atom::AtomArrayRef;
     use crate::external_info::element_table::{self, Element};
+    use crate::lattice::Lattice;
     use crate::parser::msi_parser::parse_lattice;
-    use crate::{atom::Atom, cell::Cell};
+    use crate::{atom::Atom, cell::CellOutput};
     use glob::glob;
     use rayon::prelude::*;
     use regex::Regex;
@@ -28,9 +31,9 @@ pub mod param_writer {
             .for_each(|entry| match entry {
                 Ok(path) => {
                     let mut lattice = parse_lattice(path.to_str().unwrap());
-                    let mut cell = Cell::new(&mut lattice, false);
-                    cell.sort_atoms_by_elements();
-                    write_seed_files_for_cell(&cell, &element_infotab);
+                    lattice.sort_atoms_by_elements();
+                    write_seed_files_for_cell(&mut lattice, &element_infotab)
+                        .expect("Write seed files fail");
                     bar.inc(1);
                 }
                 Err(e) => println!("glob entry match error: {:?}", e),
@@ -83,37 +86,42 @@ use MaterialsScript qw(:all);
         fs::write(Path::new("msi_to_xsd.pl"), contents).expect("Failed writing msi_to_xsd.pl");
     }
 
-    pub fn write_seed_files_for_cell(cell: &Cell, element_infotab: &HashMap<String, Element>) {
-        let cell_output = cell.format_output(element_infotab);
-        let cell_path = export_filepath(cell, ".cell");
+    pub fn write_seed_files_for_cell(
+        lattice: &mut Lattice,
+        element_infotab: &HashMap<String, Element>,
+    ) -> Result<(), Box<dyn Error>> {
+        let cell_output = lattice.cell_output(element_infotab);
+        let cell_path = export_filepath(lattice, ".cell")?;
         fs::write(cell_path, cell_output).expect("Failed to write .cell file!");
-        write_param(cell, element_infotab);
-        write_kptaux(cell);
-        write_trjaux(cell);
+        write_param(lattice, element_infotab)?;
+        write_kptaux(lattice)?;
+        write_trjaux(lattice)?;
         #[cfg(not(debug_assertions))]
-        copy_potentials(cell, element_infotab);
+        copy_potentials(lattice, element_infotab)?;
 
-        copy_smcastep_extension(cell);
+        copy_smcastep_extension(lattice)?;
         // Currently asked for lsf
-        write_lsf_script(cell);
-        let export_dir = export_destination(cell);
+        write_lsf_script(lattice)?;
+        let export_dir = export_destination(lattice)?;
         let msi_path = export_dir
             .parent()
             .unwrap()
-            .join(&format!("{}.msi", cell.get_cell_name()));
+            .join(&format!("{}.msi", lattice.lattice_name()));
         let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
         if moved_dest.exists() == false {
-            fs::rename(&msi_path, moved_dest).expect("Move msi file failed!");
+            fs::rename(&msi_path, moved_dest)?;
         }
+        Ok(())
     }
 
-    pub fn export_destination(cell: &Cell) -> PathBuf {
-        let main_metal_element: &Atom = cell
-            .lattice
-            .molecule
-            .get_atom_by_id(cell.lattice.get_metal_sites()[0 as usize] as u8)
-            .unwrap();
-        let family = match main_metal_element.element_id() {
+    pub fn export_destination(lattice: &Lattice) -> Result<PathBuf, String> {
+        let main_metal_element: &Atom = &lattice
+            .atoms_vec()
+            .get_atom_by_id(lattice.get_metal_sites()[0 as usize])?
+            .to_owned();
+        let metal_name = main_metal_element.element_name();
+        let metal_id = main_metal_element.element_id();
+        let family = match metal_id {
             21..=30 => "3d",
             39..=48 => "4d",
             72..=80 => "5d",
@@ -123,24 +131,27 @@ use MaterialsScript qw(:all);
         let dir_path = format!(
             "GDY_TAC_models/{}/{}/{}_opt",
             family,
-            main_metal_element.element_name(),
-            cell.get_cell_name()
+            metal_name,
+            lattice.lattice_name()
         );
         create_dir_all(&dir_path).unwrap_or_else(|why| {
             println!("! {:?}", why.kind());
         });
-        Path::new(&dir_path).to_path_buf()
+        Ok(Path::new(&dir_path).to_path_buf())
     }
 
-    fn export_filepath(cell: &Cell, filename: &str) -> PathBuf {
-        let export_dest = export_destination(cell);
-        let export_filename = format!("{}{}", cell.get_cell_name(), filename);
-        export_dest.join(export_filename)
+    fn export_filepath(lattice: &Lattice, filename: &str) -> Result<PathBuf, String> {
+        let export_dest = export_destination(lattice)?;
+        let export_filename = format!("{}{}", lattice.lattice_name(), filename);
+        Ok(export_dest.join(export_filename))
     }
 
-    fn get_final_cutoff_energy(cell: &Cell, element_infotab: &HashMap<String, Element>) -> f64 {
+    fn get_final_cutoff_energy(
+        lattice: &Lattice,
+        element_infotab: &HashMap<String, Element>,
+    ) -> f64 {
         let mut energy: f64 = 0.0;
-        let element_lists = cell.lattice.get_element_list();
+        let element_lists = lattice.get_element_list();
         let fine_cutoff_energy_regex =
             Regex::new(r"([0-9]+).*FINE").expect("Error in compiling regex pattern");
         element_lists.iter().for_each(|elm| {
@@ -176,14 +187,16 @@ use MaterialsScript qw(:all);
         energy
     }
 
-    pub fn write_param(cell: &Cell, element_infotab: &HashMap<String, Element>) {
-        let geom_param_path = export_filepath(cell, ".param");
+    pub fn write_param(
+        lattice: &Lattice,
+        element_infotab: &HashMap<String, Element>,
+    ) -> Result<(), Box<dyn Error>> {
+        let geom_param_path = export_filepath(lattice, ".param")?;
         if !geom_param_path.exists() {
-            let cutoff_energy = get_final_cutoff_energy(cell, element_infotab);
-            let spin_total = cell
-                .lattice
-                .molecule
-                .atoms_iterator()
+            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab);
+            let spin_total = lattice
+                .atoms_vec()
+                .iter()
                 .map(|atom| -> u8 { element_infotab.get(atom.element_name()).unwrap().spin })
                 .reduce(|total, i| total + i)
                 .unwrap();
@@ -229,18 +242,14 @@ popn_bond_cutoff :        3.000000000000000
 pdos_calculate_weights : true
 "#
             );
-            fs::write(&geom_param_path, geom_param_content).expect(&format!(
-                "Unable to write geom param for {}",
-                geom_param_path.to_str().unwrap()
-            ));
+            fs::write(&geom_param_path, geom_param_content)?;
         }
-        let dos_param_path = export_filepath(cell, "_DOS.param");
+        let dos_param_path = export_filepath(lattice, "_DOS.param")?;
         if !dos_param_path.exists() {
-            let cutoff_energy = get_final_cutoff_energy(cell, element_infotab);
-            let spin_total = cell
-                .lattice
-                .molecule
-                .atoms_iterator()
+            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab);
+            let spin_total = lattice
+                .atoms_vec()
+                .iter()
                 .map(|atom| -> u8 { element_infotab.get(atom.element_name()).unwrap().spin })
                 .reduce(|total, i| total + i)
                 .unwrap();
@@ -283,13 +292,11 @@ pdos_calculate_weights : true
 bs_write_eigenvalues : true
 "#
             );
-            fs::write(dos_param_path, dos_param_content).expect(&format!(
-                "Unable to write dos param for {}",
-                cell.get_cell_name()
-            ));
+            fs::write(dos_param_path, dos_param_content)?;
         }
+        Ok(())
     }
-    fn write_kptaux(cell: &Cell) {
+    fn write_kptaux(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
         let kptaux_contents = r#"MP_GRID :        1       1       1
 MP_OFFSET :   0.000000000000000e+000  
 0.000000000000000e+000  0.000000000000000e+000
@@ -297,23 +304,24 @@ MP_OFFSET :   0.000000000000000e+000
    1   1
 %ENDBLOCK KPOINT_IMAGES"#
             .to_string();
-        let kptaux_path = export_filepath(cell, ".kptaux");
+        let kptaux_path = export_filepath(lattice, ".kptaux")?;
         if !kptaux_path.exists() {
             fs::write(kptaux_path, &kptaux_contents).expect(&format!(
                 "Unable to write kptaux for {}",
-                cell.get_cell_name()
+                lattice.lattice_name()
             ));
         }
-        let kptaux_dos_path = export_filepath(cell, "_DOS.kptaux");
+        let kptaux_dos_path = export_filepath(lattice, "_DOS.kptaux")?;
         if !kptaux_dos_path.exists() {
             fs::write(kptaux_dos_path, &kptaux_contents).expect(&format!(
                 "Unable to write dos_kptaux for {}",
-                cell.get_cell_name()
+                lattice.lattice_name()
             ));
         }
+        Ok(())
     }
-    fn write_trjaux(cell: &Cell) {
-        let trjaux_path = export_filepath(cell, ".trjaux");
+    fn write_trjaux(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
+        let trjaux_path = export_filepath(lattice, ".trjaux")?;
         if !trjaux_path.exists() {
             let mut trjaux_contents = String::new();
             let trjaux_header = r#"# Atom IDs to appear in any .trj file to be generated.
@@ -321,41 +329,49 @@ MP_OFFSET :   0.000000000000000e+000
 # required for animation/analysis of trajectory within Cerius2.
 "#;
             trjaux_contents.push_str(trjaux_header);
-            cell.lattice.molecule.atoms_iterator().for_each(|atom| {
+            lattice.atoms_vec().iter().for_each(|atom| {
                 trjaux_contents.push_str(&format!("{}\n", atom.atom_id()));
             });
             let trjaux_ending = r#"#Origin  0.000000000000000e+000  0.000000000000000e+000  0.000000000000000e+000"#;
             trjaux_contents.push_str(trjaux_ending);
-            fs::write(trjaux_path, trjaux_contents).expect(&format!(
-                "Unable to write trjaux for {}",
-                cell.get_cell_name()
-            ));
+            fs::write(trjaux_path, trjaux_contents)?;
         }
+        Ok(())
     }
-    fn copy_potentials(cell: &Cell, element_infotab: &HashMap<String, Element>) {
-        let target_dir = export_destination(cell);
-        cell.lattice.get_element_list().iter().for_each(|elm| {
-            let pot_file = &element_infotab.get(elm).unwrap().pot;
-            let original_file = format!("./resources/Potentials/{}", pot_file);
-            let original_path = Path::new(&original_file);
-            let dest_path = target_dir.join(pot_file);
-            if !dest_path.exists() {
-                fs::copy(original_path, dest_path).expect("Error in copying potential file!");
-            }
-        });
+    fn copy_potentials(
+        lattice: &Lattice,
+        element_infotab: &HashMap<String, Element>,
+    ) -> Result<(), Box<dyn Error>> {
+        let target_dir = export_destination(lattice)?;
+        lattice
+            .get_element_list()
+            .iter()
+            .try_for_each(|elm| -> Result<(), Box<dyn Error>> {
+                let pot_file = &element_infotab.get(elm).unwrap().pot;
+                let original_file = format!("./resources/Potentials/{}", pot_file);
+                let original_path = Path::new(&original_file);
+                let dest_path = target_dir.join(pot_file);
+                if !dest_path.exists() {
+                    fs::copy(original_path, dest_path)?;
+                    Ok(())
+                } else {
+                    Ok(())
+                }
+            })?;
+        Ok(())
     }
-    fn copy_smcastep_extension(cell: &Cell) {
-        let target_dir = export_destination(cell);
-        let target_filename = format!("SMCastep_Extension_{}.xms", cell.get_cell_name());
+    fn copy_smcastep_extension(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
+        let target_dir = export_destination(lattice)?;
+        let target_filename = format!("SMCastep_Extension_{}.xms", lattice.lattice_name());
         let target_path = target_dir.join(target_filename);
         if !target_path.exists() {
-            fs::copy("./resources/SMCastep_Extension.xms", target_path)
-                .expect("Error in copying SMCastep_Extension.xms!");
+            fs::copy("./resources/SMCastep_Extension.xms", target_path)?;
         }
+        Ok(())
     }
-    fn write_lsf_script(cell: &Cell) {
-        let target_dir = export_destination(cell);
-        let cell_name = cell.get_cell_name();
+    fn write_lsf_script(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
+        let target_dir = export_destination(lattice)?;
+        let cell_name = lattice.lattice_name();
         let cmd = format!("/home-yw/Soft/msi/MS70/MaterialsStudio7.0/etc/CASTEP/bin/RunCASTEP.sh -np $NP {cell_name}");
         let prefix = r#"APP_NAME=intelY_mid
 NP=12
@@ -366,10 +382,12 @@ RUN="RAW"
 "#;
         let content = format!("{prefix}{cmd}");
         let lsf_filepath = target_dir.join("MS70_YW_CASTEP.lsf");
-        fs::write(lsf_filepath, content).expect("Failed to write lsf scripts");
+        fs::write(lsf_filepath, content)?;
+        Ok(())
+        // .expect("Failed to write lsf scripts");
     }
     // For future need
-    // fn write_pbs_script(cell: &Cell) {
+    // fn write_pbs_script(lattice: &Lattice) {
     // todo!("Write .pbs script");
     // }
 }

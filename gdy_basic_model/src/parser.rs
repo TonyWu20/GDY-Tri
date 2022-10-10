@@ -4,7 +4,7 @@ pub mod msi_parser {
     use nalgebra::{Matrix3, Point3, Vector3};
     use regex::{Captures, Regex};
 
-    use crate::{atom::Atom, lattice::Lattice, molecule::Molecule};
+    use crate::{atom::Atom, lattice::Lattice};
 
     pub fn parse_atom(text: &str) -> Vec<Atom> {
         let atom_re = Regex::new(
@@ -18,13 +18,13 @@ pub mod msi_parser {
         let mut atom_struct_vec: Vec<Atom> = vec![];
         for cap in atom_re.captures_iter(text) {
             let element: String = cap[2].to_string();
-            let element_id: u8 = cap[1].to_string().parse::<u8>().unwrap();
+            let element_id: u32 = cap[1].to_string().parse::<u32>().unwrap();
             let point: Point3<f64> = na::point![
                 cap[3].to_string().parse::<f64>().unwrap(),
                 cap[4].to_string().parse::<f64>().unwrap(),
                 cap[5].to_string().parse::<f64>().unwrap()
             ];
-            let atom_id: u8 = cap[6].to_string().parse::<u8>().unwrap();
+            let atom_id: u32 = cap[6].to_string().parse::<u32>().unwrap();
             atom_struct_vec.push(Atom::new(element, element_id, point, atom_id));
         }
         atom_struct_vec
@@ -57,16 +57,16 @@ pub mod msi_parser {
             "Something went wrong in reading file {}",
             filename
         ));
-        let mol_name: String = Path::new(filename)
+        let lat_name: String = Path::new(filename)
             .file_stem()
             .expect("Failed getting file_stem")
             .to_str()
             .unwrap()
             .to_string();
         let atoms: Vec<Atom> = parse_atom(&contents);
-        let mol: Molecule = Molecule::new(mol_name, atoms);
         let lat_vectors: Matrix3<f64> = parse_lattice_vectors(&contents);
-        let lattice: Lattice = Lattice::new(mol, lat_vectors, vec![73, 74, 75], None);
+        let lattice: Lattice =
+            Lattice::new(lat_name, atoms, lat_vectors, vec![73, 74, 75], None, false);
         lattice
     }
 }
