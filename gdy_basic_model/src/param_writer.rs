@@ -9,6 +9,7 @@ pub mod param_writer {
     use crate::external_info::element_table::{self, Element};
     use crate::lattice::Lattice;
     use crate::parser::msi_parser::parse_lattice;
+    use crate::Export;
     use crate::{atom::Atom, cell::CellOutput};
     use glob::glob;
     use rayon::prelude::*;
@@ -30,7 +31,8 @@ pub mod param_writer {
             .into_par_iter()
             .for_each(|entry| match entry {
                 Ok(path) => {
-                    let mut lattice = parse_lattice(path.to_str().unwrap());
+                    let mut lattice =
+                        parse_lattice(path.to_str().unwrap()).unwrap_or_else(|e| panic!("{}", e));
                     lattice.sort_atoms_by_elements();
                     write_seed_files_for_cell(&mut lattice, &element_infotab)
                         .expect("Write seed files fail");
@@ -92,13 +94,12 @@ use MaterialsScript qw(:all);
     ) -> Result<(), Box<dyn Error>> {
         let cell_output = lattice.cell_output(element_infotab);
         let cell_path = export_filepath(lattice, ".cell")?;
-        fs::write(cell_path, cell_output).expect("Failed to write .cell file!");
+        fs::write(cell_path, cell_output)?;
         write_param(lattice, element_infotab)?;
         write_kptaux(lattice)?;
         write_trjaux(lattice)?;
         #[cfg(not(debug_assertions))]
         copy_potentials(lattice, element_infotab)?;
-
         copy_smcastep_extension(lattice)?;
         // Currently asked for lsf
         write_lsf_script(lattice)?;
@@ -107,9 +108,14 @@ use MaterialsScript qw(:all);
             .parent()
             .unwrap()
             .join(&format!("{}.msi", lattice.lattice_name()));
-        let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
-        if moved_dest.exists() == false {
-            fs::rename(&msi_path, moved_dest)?;
+        if msi_path.exists() == false {
+            let msi_content = lattice.format_output();
+            fs::write(msi_path, msi_content)?;
+        } else {
+            let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
+            if moved_dest.exists() == false {
+                fs::rename(&msi_path, moved_dest)?;
+            }
         }
         Ok(())
     }
