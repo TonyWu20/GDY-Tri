@@ -1,0 +1,209 @@
+Adsorbates:
+  - name: CO
+    coordAtomIds: [1]
+    stemAtomIds: [1,2]
+    planeAtomIds: [1,2,2]
+    vertical: true
+    bSym: false
+    upperAtomId: 2
+    atomNums: 2
+    pathName: ethylene
+  - name: CHO
+    coordAtomIds: [1]
+    stemAtomIds: [2, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 2
+    atomNums: 3
+    pathName: ethylene
+  - name: COCHOH
+    coordAtomIds: [3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 6
+    atomNums: 6
+    pathName: ethylene
+  - name: COCHO
+    coordAtomIds: [3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 5
+    atomNums: 5
+    pathName: ethylene
+  - name: OCH2CO
+    coordAtomIds: [1, 3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 6
+    atomNums: 6
+    pathName: ethylene
+  - name: OCH2COH
+    coordAtomIds: [1, 3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 6
+    atomNums: 7
+    pathName: ethylene
+  - name: OCH2CHOH
+    coordAtomIds: [1, 3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 8
+    pathName: ethylene
+  - name: OCH2CH
+    coordAtomIds: [1, 3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 6
+    pathName: ethylene
+  - name: OCH2CH2
+    coordAtomIds: [1, 3]
+    stemAtomIds: [1, 3]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 8
+    pathName: ethylene
+  - name: C2H4
+    coordAtomIds: [1, 2]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 3]
+    vertical: false
+    bSym: true
+    upperAtomId: 0
+    atomNums: 6
+    pathName: ethylene
+  - name: OCH2C_cyc_OH
+    coordAtomIds: [1]
+    stemAtomIds: [2, 4]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 6
+    atomNums: 7
+    pathName: acetic_acid
+  - name: CH3COOH
+    coordAtomIds: [2]
+    stemAtomIds: [2, 3]
+    planeAtomIds: [2, 3, 4]
+    vertical: true
+    bSym: false
+    upperAtomId: 7
+    atomNums: 8
+    pathName: acetic_acid
+  - name: Glyoxal
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 5
+    atomNums: 6
+    pathName: ethanol
+  - name: HOCCHO
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: true
+    upperAtomId: 4
+    atomNums: 6
+    pathName: ethanol
+  - name: HOHCCHO
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 7
+    pathName: ethanol
+  - name: Glycolaldehyde
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 8
+    pathName: ethanol
+  - name: CH2CHO
+    coordAtomIds: [5]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 5]
+    vertical: true
+    bSym: false
+    upperAtomId: 3
+    atomNums: 6
+    pathName: ethanol
+  - name: CH2CHOH
+    coordAtomIds: [1, 2]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 7
+    pathName: ethanol
+  - name: CH2CH2OH
+    coordAtomIds: [1]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 8
+    pathName: ethanol
+  - name: CH3CH2OH
+    coordAtomIds: [1]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    atomNums: 9
+    upperAtomId: 9
+    pathName: ethanol
+  - name: acetaldehyde
+    coordAtomIds: [1]
+    stemAtomIds: [1, 2]
+    planeAtomIds: [1, 2, 6]
+    vertical: true
+    bSym: false
+    upperAtomId: 6
+    atomNums: 7
+    pathName: ethanol
+  - name: CH2OHCH2O
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: false
+    upperAtomId: 4
+    atomNums: 9
+    pathName: ethanol_other
+  - name: ethylene_glycol
+    coordAtomIds: [1, 6]
+    stemAtomIds: [1, 6]
+    planeAtomIds: [1, 2, 3]
+    vertical: true
+    bSym: true
+    upperAtomId: 4
+    atomNums: 10
+    pathName: ethanol_other
+
