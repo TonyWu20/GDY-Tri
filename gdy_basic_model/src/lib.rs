@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+pub mod assemble;
 pub mod atom;
 pub mod cell;
 pub mod editor;

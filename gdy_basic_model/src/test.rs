@@ -25,32 +25,34 @@ mod test {
 
     #[test]
     #[ignore]
-    fn read_and_write() {
+    fn read_and_write() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
-        let base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
-        println!("{}", base_lat.format_output());
+        let base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
+        Ok(println!("{}", base_lat.format_output()))
     }
     #[test]
     #[ignore]
-    fn sort_atoms_in_cell() {
+    fn sort_atoms_in_cell() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
+        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
         println!("{:#?}", &base_lat.get_element_list());
         base_lat.sort_atoms_by_elements();
+        Ok(())
     }
     #[test]
     #[ignore]
-    fn rotate_lattice() {
+    fn rotate_lattice() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
+        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
         base_lat.rotate_to_standard_orientation();
         println!("{:#.12?}", base_lat.get_lattice_vectors());
         println!("{}", base_lat.format_output());
+        Ok(())
     }
     #[test]
-    fn cell_test() {
+    fn cell_test() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
+        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
         change_atom_element(
             base_lat.atoms_vec_mut().get_mut_atom_by_id(73).unwrap(),
             "Mn",
@@ -79,11 +81,12 @@ mod test {
             .unwrap();
         println!("{}", cell_output);
         println!("{spin_total}");
+        Ok(())
     }
     #[test]
     fn test_write_param() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename);
+        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
         change_atom_element(
             base_lat.atoms_vec_mut().get_mut_atom_by_id(73).unwrap(),
             "Mn",
@@ -118,7 +121,7 @@ mod test {
             .for_each(|entry| match entry {
                 Ok(path) => {
                     println!("{}", path.to_str().unwrap());
-                    let lattice = parse_lattice(path.to_str().unwrap());
+                    let lattice = parse_lattice(path.to_str().unwrap()).unwrap();
                     println!(
                         "{}",
                         export_destination(&lattice)

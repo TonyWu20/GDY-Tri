@@ -64,7 +64,16 @@ impl Adsorbate {
         let plane_normal = ba.cross(&ca).normalize();
         Ok(plane_normal)
     }
-    pub fn make_upright(&mut self) {
+    fn is_face_up(&self) -> Result<bool, String> {
+        let cd_z = self.atoms_vec.get_atom_by_id(self.coord_atom_ids[0])?.xyz()[2];
+        let up_z = self.atoms_vec.get_atom_by_id(self.upper_atom_id)?.xyz()[2];
+        if cd_z < up_z {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+    pub fn make_upright(&mut self) -> Result<(), String> {
         let stem_vector: Vector3<f64> = self
             .get_stem_vector()
             .unwrap_or_else(|_| panic!("Failed to get stem vector! Adsorbate: {}", self.mol_name));
@@ -76,7 +85,7 @@ impl Adsorbate {
             let rotate_angle = plane_normal.angle(&plane_normal_xy_proj);
             let rot_axis = plane_normal.cross(&plane_normal_xy_proj);
             let rot_axis_stem_angle = rot_axis.angle(&stem_vector);
-            let rotation_quaternion = if rot_axis_stem_angle < PI / 2.0 {
+            let rot_quatd = if rot_axis_stem_angle < PI / 2.0 {
                 UnitQuaternion::from_axis_angle(&Unit::new_normalize(stem_vector), rotate_angle)
             } else {
                 UnitQuaternion::from_axis_angle(
@@ -84,9 +93,23 @@ impl Adsorbate {
                     rotate_angle,
                 )
             };
-            self.atoms_vec.rotate(rotation_quaternion);
+            self.atoms_vec.rotate(rot_quatd);
+        } else {
+            let z_axis: Vector3<f64> = Vector3::from_vec(vec![0.0, 0.0, 1.0]);
+            let angle = stem_vector.angle(&z_axis);
+            let rot_axis = Unit::new_normalize(stem_vector.cross(&z_axis));
+            let rot_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
+            self.atoms_vec.rotate(rot_quatd);
         }
-        todo!();
+        if self.is_face_up()? == false {
+            let stem_vector = self.get_stem_vector()?;
+            let invert_quatd =
+                UnitQuaternion::from_axis_angle(&Unit::new_normalize(stem_vector), PI);
+            self.atoms_vec.rotate(invert_quatd);
+            Ok(())
+        } else {
+            Ok(())
+        }
     }
 }
 

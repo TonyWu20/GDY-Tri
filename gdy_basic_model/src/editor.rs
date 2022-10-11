@@ -1,5 +1,6 @@
 pub mod msi_editor {
     use std::{
+        error::Error,
         fs::{self, create_dir_all},
         path::{Path, PathBuf},
     };
@@ -19,10 +20,13 @@ pub mod msi_editor {
         target_atom.set_element_name(new_element_name);
         target_atom.set_element_id(new_element_id);
     }
-    pub fn iterate_over_elements(target_lattice: &mut Lattice, to_use_metals: &Vec<&Element>) {
+    pub fn iterate_over_elements(
+        target_lattice: &mut Lattice,
+        to_use_metals: &Vec<&Element>,
+    ) -> Result<(), Box<dyn Error>> {
         let mut export_dirs: Vec<PathBuf> = vec![];
         for metal in to_use_metals.iter() {
-            export_dirs.push(export_destination(metal));
+            export_dirs.push(export_destination(metal)?);
         }
         let metals_dirs = to_use_metals.iter().zip(export_dirs);
         let bar = ProgressBar::new((to_use_metals.len().pow(2)) as u64);
@@ -59,9 +63,9 @@ pub mod msi_editor {
                 bar.inc(1)
             }
         }
-        bar.finish();
+        Ok(bar.finish())
     }
-    pub fn export_destination(element: &Element) -> PathBuf {
+    pub fn export_destination(element: &Element) -> Result<PathBuf, Box<dyn Error>> {
         let family: &str = match element.atomic_number {
             21..=30 => "3d",
             39..=48 => "4d",
@@ -70,13 +74,11 @@ pub mod msi_editor {
             _ => "else",
         };
         let dir_path = format!("./GDY_TAC_models/{}/{}", family, element.symbol);
-        create_dir_all(&dir_path).unwrap_or_else(|why| {
-            println!("! {:?}", why.kind());
-        });
-        Path::new(&dir_path).to_path_buf()
+        create_dir_all(&dir_path)?;
+        Ok(Path::new(&dir_path).to_path_buf())
     }
-    pub fn generate_all_base_models(src_filename: &str) {
-        let mut src_lattice = parse_lattice(src_filename);
+    pub fn generate_all_base_models(src_filename: &str) -> Result<(), Box<dyn Error>> {
+        let mut src_lattice = parse_lattice(src_filename)?;
         let elements: &[&Element] = pt::periodic_table();
         let metals_3d: &[&Element] = &elements[20..30];
         let metals_4d: &[&Element] = &elements[38..48];
@@ -87,6 +89,7 @@ pub mod msi_editor {
         total_elements.extend_from_slice(metals_4d);
         total_elements.extend_from_slice(metals_5d);
         total_elements.extend_from_slice(metals_rare_earth);
-        iterate_over_elements(&mut src_lattice, &total_elements);
+        iterate_over_elements(&mut src_lattice, &total_elements)?;
+        Ok(())
     }
 }
