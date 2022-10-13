@@ -1,6 +1,8 @@
 extern crate serde;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, ops::Deref};
+use std::{collections::HashMap, error::Error, fs, ops::Deref, path::Path};
+
+use super::YamlTable;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Element {
@@ -14,22 +16,27 @@ pub struct Element {
     pub spin: u8,
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct ElmInfo {
+pub struct ElmTab {
     #[serde(rename = "Element_info")]
     pub elements: Option<Vec<Element>>,
 }
 
-pub fn load_table() -> Result<ElmInfo, serde_yaml::Error> {
-    let yaml_table = fs::File::open("./resources/element_table.yaml")
-        .expect("Something wrong in reading element_table.yaml");
-    let table: ElmInfo = serde_yaml::from_reader(yaml_table)?;
-    Ok(table)
-}
-pub fn hash_table() -> HashMap<String, Element> {
-    let table = load_table().unwrap();
-    let mut hash_tab: HashMap<String, Element> = HashMap::new();
-    table.elements.unwrap().iter().for_each(|elm: &Element| {
-        hash_tab.insert(elm.element.to_string(), elm.deref().clone());
-    });
-    hash_tab
+impl YamlTable for ElmTab {
+    type Table = ElmTab;
+    type TableItem = Element;
+    fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn std::error::Error>> {
+        let yaml_table = fs::File::open(filepath)?;
+        let table: ElmTab = serde_yaml::from_reader(yaml_table)?;
+        Ok(table)
+    }
+    fn hash_table<P: AsRef<Path>>(
+        filepath: P,
+    ) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>> {
+        let table = Self::load_table(filepath)?;
+        let mut hash_tab: HashMap<String, Element> = HashMap::new();
+        table.elements.unwrap().iter().for_each(|elm: &Element| {
+            hash_tab.insert(elm.element.to_string(), elm.deref().clone());
+        });
+        Ok(hash_tab)
+    }
 }

@@ -162,6 +162,10 @@ impl Atom {
     // pub fn mass(&self) -> f64 {
     //     self.mass
     // }
+
+    pub fn set_atom_id(&mut self, atom_id: u32) {
+        self.atom_id = atom_id;
+    }
 }
 
 impl Export for Atom {

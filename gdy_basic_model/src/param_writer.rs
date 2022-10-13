@@ -7,6 +7,7 @@ pub mod param_writer {
 
     use crate::atom::AtomArrayRef;
     use crate::external_info::element_table::{self, Element};
+    use crate::external_info::YamlTable;
     use crate::lattice::Lattice;
     use crate::parser::msi_parser::parse_lattice;
     use crate::Export;
@@ -15,8 +16,8 @@ pub mod param_writer {
     use rayon::prelude::*;
     use regex::Regex;
 
-    pub fn generate_all_seed_files(root_dir: &str) {
-        let element_infotab = element_table::hash_table();
+    pub fn generate_all_seed_files(root_dir: &str) -> Result<(), Box<dyn Error>> {
+        let element_infotab = element_table::ElmTab::hash_table("./resources/element_table.yaml")?;
         let msi_pattern = format!("{root_dir}/**/*.msi");
         let file_iter = glob(&msi_pattern)
             .expect("Failed to read glob pattern")
@@ -40,7 +41,7 @@ pub mod param_writer {
                 }
                 Err(e) => println!("glob entry match error: {:?}", e),
             });
-        bar.finish();
+        Ok(bar.finish())
     }
     pub fn to_xsd_scripts(root_dir: &str) {
         let msi_pattern = format!("{root_dir}/**/*.msi");

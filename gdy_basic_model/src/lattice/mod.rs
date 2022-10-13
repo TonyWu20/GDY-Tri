@@ -1,13 +1,17 @@
 use periodic_table_on_an_enum as pt_enum;
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::{collections::HashSet, error::Error};
 
-use na::{Matrix3, UnitQuaternion, Vector, Vector3};
+use na::{Matrix3, Translation3, Unit, UnitQuaternion, Vector, Vector3};
 
+use crate::molecule::adsorbate::Adsorbate;
 use crate::{
-    atom::{Atom, AtomArray},
+    assemble::AdsAddition,
+    atom::{Atom, AtomArray, AtomArrayRef},
     Export, Transformation,
 };
 
+#[derive(Clone)]
 pub struct Lattice {
     lattice_name: String,
     atoms_vec: Vec<Atom>,
@@ -15,6 +19,7 @@ pub struct Lattice {
     metal_sites: Vec<u32>,
     adsorbate: Option<String>,
     sorted: bool,
+    pathway: Option<String>,
 }
 
 impl Lattice {
@@ -33,6 +38,7 @@ impl Lattice {
             metal_sites,
             adsorbate,
             sorted,
+            pathway: None,
         }
     }
 
@@ -126,6 +132,10 @@ impl Lattice {
         &mut self.atoms_vec
     }
 
+    pub fn sorted(&self) -> bool {
+        self.sorted
+    }
+
     pub fn set_sorted(&mut self, sorted: bool) {
         self.sorted = sorted;
     }
@@ -169,9 +179,24 @@ impl Lattice {
         let to_frac = to_cart.try_inverse().unwrap();
         to_frac
     }
+    pub fn add_atoms(&mut self, new_atoms: &[Atom]) -> Result<(), Box<dyn Error>> {
+        let lat_last_atom_id = self
+            .atoms_vec()
+            .get_atom_by_id(self.atoms_vec().len() as u32)?
+            .atom_id();
+        new_atoms.to_vec().into_iter().for_each(|mut atom| {
+            atom.set_atom_id(lat_last_atom_id + atom.atom_id());
+            self.atoms_vec_mut().push(atom);
+        });
+        Ok(())
+    }
 
-    pub fn sorted(&self) -> bool {
-        self.sorted
+    pub fn pathway(&self) -> Option<&String> {
+        self.pathway.as_ref()
+    }
+
+    pub fn set_pathway(&mut self, pathway: Option<String>) {
+        self.pathway = pathway;
     }
 }
 
@@ -203,5 +228,111 @@ impl Transformation for Lattice {
     }
     fn translate(&mut self, translate_matrix: na::Translation<f64, 3>) {
         self.atoms_vec.translate(translate_matrix);
+    }
+}
+
+impl AdsAddition for Lattice {
+    fn append_mol_name(
+        &mut self,
+        ads: &Adsorbate,
+        site_1: u32,
+        site_2: Option<u32>,
+        coord_site_dict: &HashMap<u32, String>,
+    ) -> Result<(), Box<dyn Error>> {
+        let new_name = match site_2 {
+            Some(site_2) => {
+                let suf_1 = coord_site_dict.get(&site_1).unwrap().to_owned();
+                let suf_2 = coord_site_dict.get(&site_2).unwrap().to_owned();
+                format!(
+                    "{}_{}_{}_{}",
+                    self.lattice_name(),
+                    ads.mol_name(),
+                    suf_1,
+                    suf_2
+                )
+            }
+            None => {
+                format!(
+                    "{}_{}_{}",
+                    self.lattice_name(),
+                    ads.mol_name(),
+                    coord_site_dict.get(&site_1).unwrap().to_owned()
+                )
+            }
+        };
+        self.set_lattice_name(new_name);
+        Ok(())
+    }
+
+    fn init_ads_direction(
+        &self,
+        ads: &mut Adsorbate,
+        site_1: u32,
+        site_2: Option<u32>,
+        flip_upright: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        let ads_stem_vec = ads.get_stem_vector()?;
+        let (target_site_1, target_site_2) = match site_2 {
+            Some(site_2) => (site_1, site_2),
+            None => (41, 42),
+        };
+        let direction_vec = self
+            .atoms_vec()
+            .get_vector_ab(target_site_1, target_site_2)?;
+        let angle_stem_chain = ads_stem_vec.angle(&direction_vec);
+        let rot_axis = Unit::new_normalize(ads_stem_vec.cross(&direction_vec));
+        let rot_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle_stem_chain);
+        ads.atoms_vec_mut().rotate(rot_quatd);
+        if flip_upright == true {
+            ads.make_upright()?;
+        }
+        Ok(())
+    }
+
+    fn add_ads(
+        &mut self,
+        ads: &mut Adsorbate,
+        site_1: u32,
+        site_2: Option<u32>,
+        height: f64,
+        flip_upright: bool,
+        coord_site_dict: &HashMap<u32, String>,
+    ) -> Result<(), Box<dyn Error>> {
+        Self::init_ads_direction(&self, ads, site_1, site_2, flip_upright)?;
+        /*
+        If site_2 exists or the adsorbate has two coordination atoms,
+        the coordinate sites follows the adsorbate info.
+        If site_2 does not exists and the adsorbate has one coordinate atom,
+        both sites are assigned to the only one coordinate atom.
+        */
+        let (cd_1, cd_2) = if site_2.is_some() || ads.coord_atom_nums() == 2 {
+            (ads.coord_atom_ids()[0], ads.coord_atom_ids()[1])
+        } else {
+            (ads.coord_atom_ids()[0], ads.coord_atom_ids()[0])
+        };
+        let (carbon_1, carbon_2) = if site_2.is_some() || ads.coord_atom_nums() == 2 {
+            (site_1, site_2.unwrap())
+        } else {
+            (site_1, site_1)
+        };
+        // Get the center coordinates of the two carbon sites.
+        let carbon_sites = (
+            self.atoms_vec().get_atom_by_id(carbon_1)?.xyz().clone(),
+            self.atoms_vec().get_atom_by_id(carbon_2)?.xyz().clone(),
+        );
+        let cd_sites = (
+            ads.atoms_vec().get_atom_by_id(cd_1)?.xyz().clone(),
+            ads.atoms_vec().get_atom_by_id(cd_2)?.xyz().clone(),
+        );
+        let carbon_sites_centroid = na::center(&carbon_sites.0, &carbon_sites.1);
+        let cd_sites_centroid = na::center(&cd_sites.0, &cd_sites.1);
+        let mut trans_matrix = Translation3::from(carbon_sites_centroid - cd_sites_centroid);
+        trans_matrix.vector.z += height;
+        ads.atoms_vec_mut().translate(trans_matrix);
+        self.add_atoms(ads.atoms_vec())?;
+        self.set_adsorbate_name(ads.mol_name().to_string());
+        self.set_pathway(Some(ads.pathway_name().to_string()));
+        self.append_mol_name(ads, site_1, site_2, coord_site_dict)?;
+        Ok(())
     }
 }

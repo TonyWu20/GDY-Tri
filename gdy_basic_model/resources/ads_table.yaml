@@ -1,3 +1,4 @@
+directory: C2_pathways_ads
 Adsorbates:
   - name: CO
     coordAtomIds: [1]

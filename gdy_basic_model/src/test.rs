@@ -1,13 +1,19 @@
 #[cfg(test)]
 mod test {
     use std::error::Error;
+    use std::fs;
 
+    use crate::assemble::AdsAddition;
     use crate::atom::AtomArray;
     use crate::cell::CellOutput;
+    use crate::external_info::adsorbate_table::AdsTab;
+    use crate::external_info::element_table;
+    use crate::external_info::project::load_project_info;
+    use crate::external_info::YamlTable;
     use crate::lattice::Lattice;
     use crate::param_writer::param_writer::{export_destination, write_seed_files_for_cell};
-    use crate::parser::msi_parser::parse_lattice;
-    use crate::{external_info::element_table, *};
+    use crate::parser::msi_parser::{parse_adsorbate, parse_lattice};
+    use crate::Export;
     use glob::glob;
     use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
@@ -23,32 +29,6 @@ mod test {
     //     editor::msi_editor::iterate_over_elements(&mut base_lat);
     // }
 
-    #[test]
-    #[ignore]
-    fn read_and_write() -> Result<(), Box<dyn Error>> {
-        let filename = "./resources/GDY_tri.msi";
-        let base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
-        Ok(println!("{}", base_lat.format_output()))
-    }
-    #[test]
-    #[ignore]
-    fn sort_atoms_in_cell() -> Result<(), Box<dyn Error>> {
-        let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
-        println!("{:#?}", &base_lat.get_element_list());
-        base_lat.sort_atoms_by_elements();
-        Ok(())
-    }
-    #[test]
-    #[ignore]
-    fn rotate_lattice() -> Result<(), Box<dyn Error>> {
-        let filename = "./resources/GDY_tri.msi";
-        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
-        base_lat.rotate_to_standard_orientation();
-        println!("{:#.12?}", base_lat.get_lattice_vectors());
-        println!("{}", base_lat.format_output());
-        Ok(())
-    }
     #[test]
     fn cell_test() -> Result<(), Box<dyn Error>> {
         let filename = "./resources/GDY_tri.msi";
@@ -71,7 +51,7 @@ mod test {
         // let frac_mat = fractional_coord_matrix(&base_lat);
         base_lat.sort_atoms_by_elements();
         base_lat.rotate_to_standard_orientation();
-        let element_info = element_table::hash_table();
+        let element_info = element_table::ElmTab::hash_table("resources/element_table.yaml")?;
         let cell_output = base_lat.cell_output(&element_info);
         let spin_total = base_lat
             .atoms_vec()
@@ -104,7 +84,7 @@ mod test {
         );
         // let frac_mat = fractional_coord_matrix(&base_lat);
         base_lat.update_base_name();
-        let element_info = element_table::hash_table();
+        let element_info = element_table::ElmTab::hash_table("./resources/element_table.yaml")?;
         write_seed_files_for_cell(&mut base_lat, &element_info)?;
         Ok(())
     }
@@ -132,5 +112,70 @@ mod test {
                 }
                 Err(e) => println!("{:?}", e),
             });
+    }
+    #[test]
+    fn test_parse_ads() -> Result<(), Box<dyn Error>> {
+        let parent_dir = AdsTab::load_table("./resources/ads_table.yaml")?
+            .directory()
+            .to_string();
+        let hash_table = AdsTab::hash_table("./resources/ads_table.yaml")?;
+        let ads_info = hash_table.get("CH2CHOH").unwrap();
+        let parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
+        println!("{:?}", parsed_ads.atoms_vec());
+        Ok(())
+    }
+    #[test]
+    fn add_ads_to_lat() -> Result<(), Box<dyn Error>> {
+        let filename = "./resources/GDY_tri.msi";
+        let mut base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
+        change_atom_element(
+            base_lat.atoms_vec_mut().get_mut_atom_by_id(73).unwrap(),
+            "Mn",
+            25,
+        );
+        change_atom_element(
+            base_lat.atoms_vec_mut().get_mut_atom_by_id(74).unwrap(),
+            "Mn",
+            25,
+        );
+        change_atom_element(
+            base_lat.atoms_vec_mut().get_mut_atom_by_id(75).unwrap(),
+            "Ni",
+            28,
+        );
+        // let frac_mat = fractional_coord_matrix(&base_lat);
+        base_lat.update_base_name();
+        let parent_dir = AdsTab::load_table("./resources/ads_table.yaml")?
+            .directory()
+            .to_string();
+        let hash_table = AdsTab::hash_table("./resources/ads_table.yaml")?;
+        let ads_info = hash_table.get("CH2CHOH").unwrap();
+        let mut parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
+        let project_info = load_project_info("./resources/project.yaml")?;
+        let coord_site_dict = project_info.hash_coord_site();
+        let coord_cases = &project_info.coord_cases()[0];
+        coord_cases
+            .get_cases(false)
+            .iter()
+            .try_for_each(|case| -> Result<(), Box<dyn Error>> {
+                let mut new_lat = base_lat.clone();
+                new_lat.add_ads(
+                    &mut parsed_ads,
+                    case.0,
+                    case.1,
+                    1.4,
+                    false,
+                    &coord_site_dict,
+                )?;
+                let result = new_lat.format_output();
+                let element_info =
+                    element_table::ElmTab::hash_table("./resources/element_table.yaml")?;
+                let cell = new_lat.cell_output(&element_info);
+                let cell_name = new_lat.lattice_name();
+                fs::write("test.msi", result)?;
+                fs::write(format!("{}.cell", cell_name), cell)?;
+                Ok(())
+            })?;
+        Ok(())
     }
 }

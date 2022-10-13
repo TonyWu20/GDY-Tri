@@ -1,0 +1,25 @@
+base_model_loc: ./resources/GDY_tri.msi
+element_table_loc: resources/element_table.yaml
+adsorbate_table_loc: resources/ads_table.yaml
+potentials_loc: resources/Potentials
+export_loc: GDY_TAC_models
+coord_sites:
+  - name: c1
+    atom_id: 41
+  - name: c2
+    atom_id: 42
+  - name: c3
+    atom_id: 54
+  - name: c4
+    atom_id: 53
+  - name: FR
+    atom_id: 52
+  - name: NR
+    atom_id: 40
+  - name: M
+    atom_id: 73
+coord_cases:
+  - name: double
+    cases: [[41,42], [42,54], [54,53], [53,52], [41, 40], [41, 73], [42, 73]]
+  - name: single
+    cases: [[41, null], [42, null], [54, null], [53, null], [52, null], [40, null], [73, null]]

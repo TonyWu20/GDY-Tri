@@ -115,6 +115,7 @@ impl CellOutput for Lattice {
         if self.sorted() == false {
             self.sort_atoms_by_elements();
         }
+        self.rotate_to_standard_orientation();
         let mut content = String::new();
         let block_lat_vec = self.write_block(self.lattice_vector_str());
         content.push_str(&block_lat_vec);
