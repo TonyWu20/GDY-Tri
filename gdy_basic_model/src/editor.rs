@@ -1,17 +1,17 @@
-pub mod msi_editor {
+pub mod gdy_tri_editor {
     use std::{
         error::Error,
         fs::{self, create_dir_all},
         path::{Path, PathBuf},
     };
 
-    use crate::{atom::Atom, Export};
-    use crate::{atom::AtomArray, lattice::Lattice};
+    use castep_model_generator_backend::{atom::Atom, Export};
+    use castep_model_generator_backend::{atom::AtomArray, lattice::Lattice};
     use indicatif::ProgressBar;
     use periodic_table as pt;
     use pt::Element;
 
-    use crate::parser::msi_parser::parse_lattice;
+    use castep_model_generator_backend::parser::msi_parser::parse_lattice;
     pub fn change_atom_element(
         target_atom: &mut Atom,
         new_element_name: &str,
@@ -22,11 +22,12 @@ pub mod msi_editor {
     }
     pub fn iterate_over_elements(
         target_lattice: &mut Lattice,
+        target_root_dir: &str,
         to_use_metals: &Vec<&Element>,
     ) -> Result<(), Box<dyn Error>> {
         let mut export_dirs: Vec<PathBuf> = vec![];
         for metal in to_use_metals.iter() {
-            export_dirs.push(export_destination(metal)?);
+            export_dirs.push(export_destination(metal, target_root_dir)?);
         }
         let metals_dirs = to_use_metals.iter().zip(export_dirs);
         let bar = ProgressBar::new((to_use_metals.len().pow(2)) as u64);
@@ -47,7 +48,6 @@ pub mod msi_editor {
                     .get_mut_atom_by_id(75)
                     .unwrap();
                 change_atom_element(atom_3, item_b.symbol, item_b.atomic_number);
-                target_lattice.update_base_name();
                 let text = target_lattice.format_output();
                 let lat_name = target_lattice.lattice_name();
                 let filepath = dir.join(format!("{}_opt/{}.msi", &lat_name, &lat_name));
@@ -65,7 +65,10 @@ pub mod msi_editor {
         }
         Ok(bar.finish())
     }
-    pub fn export_destination(element: &Element) -> Result<PathBuf, Box<dyn Error>> {
+    pub fn export_destination(
+        element: &Element,
+        target_root_dir: &str,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let family: &str = match element.atomic_number {
             21..=30 => "3d",
             39..=48 => "4d",
@@ -73,11 +76,14 @@ pub mod msi_editor {
             57..=71 => "rare_earth",
             _ => "else",
         };
-        let dir_path = format!("./GDY_TAC_models/{}/{}", family, element.symbol);
+        let dir_path = format!("./{}/{}/{}", target_root_dir, family, element.symbol);
         create_dir_all(&dir_path)?;
         Ok(Path::new(&dir_path).to_path_buf())
     }
-    pub fn generate_all_base_models(src_filename: &str) -> Result<(), Box<dyn Error>> {
+    pub fn generate_all_base_models(
+        src_filename: &str,
+        target_root_dir: &str,
+    ) -> Result<(), Box<dyn Error>> {
         let mut src_lattice = parse_lattice(src_filename)?;
         let elements: &[&Element] = pt::periodic_table();
         let metals_3d: &[&Element] = &elements[20..30];
@@ -89,8 +95,7 @@ pub mod msi_editor {
         total_elements.extend_from_slice(metals_4d);
         total_elements.extend_from_slice(metals_5d);
         total_elements.extend_from_slice(metals_rare_earth);
-        iterate_over_elements(&mut src_lattice, &total_elements)?;
+        iterate_over_elements(&mut src_lattice, target_root_dir, &total_elements)?;
         Ok(())
     }
 }
-
