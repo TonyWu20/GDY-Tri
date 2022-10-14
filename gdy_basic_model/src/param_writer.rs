@@ -16,9 +16,14 @@ pub mod param_writer {
     use rayon::prelude::*;
     use regex::Regex;
 
-    pub fn generate_all_seed_files(root_dir: &str) -> Result<(), Box<dyn Error>> {
-        let element_infotab = element_table::ElmTab::hash_table("./resources/element_table.yaml")?;
-        let msi_pattern = format!("{root_dir}/**/*.msi");
+    pub fn generate_all_seed_files<P: AsRef<Path>>(
+        element_tab_loc: P,
+        target_root_dir: &str,
+        potentials_loc: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let element_tab = element_table::ElmTab::load_table(element_tab_loc)?;
+        let element_infotab = element_tab.hash_table()?;
+        let msi_pattern = format!("{target_root_dir}/**/*.msi");
         let file_iter = glob(&msi_pattern)
             .expect("Failed to read glob pattern")
             .into_iter();
@@ -35,16 +40,21 @@ pub mod param_writer {
                     let mut lattice =
                         parse_lattice(path.to_str().unwrap()).unwrap_or_else(|e| panic!("{}", e));
                     lattice.sort_atoms_by_elements();
-                    write_seed_files_for_cell(&mut lattice, &element_infotab)
-                        .expect("Write seed files fail");
+                    write_seed_files_for_cell(
+                        &mut lattice,
+                        target_root_dir,
+                        &element_infotab,
+                        potentials_loc,
+                    )
+                    .expect("Write seed files fail");
                     bar.inc(1);
                 }
                 Err(e) => println!("glob entry match error: {:?}", e),
             });
         Ok(bar.finish())
     }
-    pub fn to_xsd_scripts(root_dir: &str) {
-        let msi_pattern = format!("{root_dir}/**/*.msi");
+    pub fn to_xsd_scripts(target_root_dir: &str) {
+        let msi_pattern = format!("{target_root_dir}/**/*.msi");
         let item_collection = glob(&msi_pattern)
             .expect("Failed to read glob pattern")
             .into_iter()
@@ -91,20 +101,22 @@ use MaterialsScript qw(:all);
 
     pub fn write_seed_files_for_cell(
         lattice: &mut Lattice,
+        target_root_dir: &str,
         element_infotab: &HashMap<String, Element>,
+        potentials_loc: &str,
     ) -> Result<(), Box<dyn Error>> {
         let cell_output = lattice.cell_output(element_infotab);
-        let cell_path = export_filepath(lattice, ".cell")?;
+        let cell_path = export_filepath(lattice, target_root_dir, ".cell")?;
         fs::write(cell_path, cell_output)?;
-        write_param(lattice, element_infotab)?;
-        write_kptaux(lattice)?;
-        write_trjaux(lattice)?;
+        write_param(lattice, target_root_dir, element_infotab, potentials_loc)?;
+        write_kptaux(lattice, target_root_dir)?;
+        write_trjaux(lattice, target_root_dir)?;
         #[cfg(not(debug_assertions))]
-        copy_potentials(lattice, element_infotab)?;
-        copy_smcastep_extension(lattice)?;
+        copy_potentials(lattice, target_root_dir, element_infotab, potentials_loc)?;
+        copy_smcastep_extension(lattice, target_root_dir)?;
         // Currently asked for lsf
-        write_lsf_script(lattice)?;
-        let export_dir = export_destination(lattice)?;
+        write_lsf_script(lattice, target_root_dir)?;
+        let export_dir = export_destination(lattice, target_root_dir)?;
         let msi_path = export_dir
             .parent()
             .unwrap()
@@ -121,7 +133,7 @@ use MaterialsScript qw(:all);
         Ok(())
     }
 
-    pub fn export_destination(lattice: &Lattice) -> Result<PathBuf, String> {
+    pub fn export_destination(lattice: &Lattice, target_root_dir: &str) -> Result<PathBuf, String> {
         let main_metal_element: &Atom = &lattice
             .atoms_vec()
             .get_atom_by_id(lattice.get_metal_sites()[0 as usize])?
@@ -136,7 +148,7 @@ use MaterialsScript qw(:all);
             _ => "else",
         };
         let dir_path = format!(
-            "GDY_TAC_models/{}/{}/{}_opt",
+            "{target_root_dir}/{}/{}/{}_opt",
             family,
             metal_name,
             lattice.lattice_name()
@@ -147,8 +159,12 @@ use MaterialsScript qw(:all);
         Ok(Path::new(&dir_path).to_path_buf())
     }
 
-    fn export_filepath(lattice: &Lattice, filename: &str) -> Result<PathBuf, String> {
-        let export_dest = export_destination(lattice)?;
+    fn export_filepath(
+        lattice: &Lattice,
+        target_root_dir: &str,
+        filename: &str,
+    ) -> Result<PathBuf, String> {
+        let export_dest = export_destination(lattice, target_root_dir)?;
         let export_filename = format!("{}{}", lattice.lattice_name(), filename);
         Ok(export_dest.join(export_filename))
     }
@@ -156,6 +172,7 @@ use MaterialsScript qw(:all);
     fn get_final_cutoff_energy(
         lattice: &Lattice,
         element_infotab: &HashMap<String, Element>,
+        potentials_loc: &str,
     ) -> f64 {
         let mut energy: f64 = 0.0;
         let element_lists = lattice.get_element_list();
@@ -164,7 +181,7 @@ use MaterialsScript qw(:all);
         element_lists.iter().for_each(|elm| {
             let potential_file = &element_infotab.get(elm).unwrap().pot;
             let potential_file_contents =
-                read_to_string(format!("./resources/Potentials/{potential_file}"))
+                read_to_string(format!("{}/{potential_file}", potentials_loc))
                     .expect("Errors in opening potential file");
             let fine_cutoff_energy: u32 = fine_cutoff_energy_regex
                 .captures(&potential_file_contents)
@@ -196,11 +213,13 @@ use MaterialsScript qw(:all);
 
     pub fn write_param(
         lattice: &Lattice,
+        target_root_dir: &str,
         element_infotab: &HashMap<String, Element>,
+        potentials_loc: &str,
     ) -> Result<(), Box<dyn Error>> {
-        let geom_param_path = export_filepath(lattice, ".param")?;
+        let geom_param_path = export_filepath(lattice, target_root_dir, ".param")?;
         if !geom_param_path.exists() {
-            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab);
+            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab, potentials_loc);
             let spin_total = lattice
                 .atoms_vec()
                 .iter()
@@ -251,9 +270,9 @@ pdos_calculate_weights : true
             );
             fs::write(&geom_param_path, geom_param_content)?;
         }
-        let dos_param_path = export_filepath(lattice, "_DOS.param")?;
+        let dos_param_path = export_filepath(lattice, target_root_dir, "_DOS.param")?;
         if !dos_param_path.exists() {
-            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab);
+            let cutoff_energy = get_final_cutoff_energy(lattice, element_infotab, potentials_loc);
             let spin_total = lattice
                 .atoms_vec()
                 .iter()
@@ -303,7 +322,7 @@ bs_write_eigenvalues : true
         }
         Ok(())
     }
-    fn write_kptaux(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
+    fn write_kptaux(lattice: &Lattice, target_root_dir: &str) -> Result<(), Box<dyn Error>> {
         let kptaux_contents = r#"MP_GRID :        1       1       1
 MP_OFFSET :   0.000000000000000e+000  
 0.000000000000000e+000  0.000000000000000e+000
@@ -311,14 +330,14 @@ MP_OFFSET :   0.000000000000000e+000
    1   1
 %ENDBLOCK KPOINT_IMAGES"#
             .to_string();
-        let kptaux_path = export_filepath(lattice, ".kptaux")?;
+        let kptaux_path = export_filepath(lattice, target_root_dir, ".kptaux")?;
         if !kptaux_path.exists() {
             fs::write(kptaux_path, &kptaux_contents).expect(&format!(
                 "Unable to write kptaux for {}",
                 lattice.lattice_name()
             ));
         }
-        let kptaux_dos_path = export_filepath(lattice, "_DOS.kptaux")?;
+        let kptaux_dos_path = export_filepath(lattice, target_root_dir, "_DOS.kptaux")?;
         if !kptaux_dos_path.exists() {
             fs::write(kptaux_dos_path, &kptaux_contents).expect(&format!(
                 "Unable to write dos_kptaux for {}",
@@ -327,8 +346,8 @@ MP_OFFSET :   0.000000000000000e+000
         }
         Ok(())
     }
-    fn write_trjaux(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
-        let trjaux_path = export_filepath(lattice, ".trjaux")?;
+    fn write_trjaux(lattice: &Lattice, target_root_dir: &str) -> Result<(), Box<dyn Error>> {
+        let trjaux_path = export_filepath(lattice, target_root_dir, ".trjaux")?;
         if !trjaux_path.exists() {
             let mut trjaux_contents = String::new();
             let trjaux_header = r#"# Atom IDs to appear in any .trj file to be generated.
@@ -347,15 +366,17 @@ MP_OFFSET :   0.000000000000000e+000
     }
     fn copy_potentials(
         lattice: &Lattice,
+        target_root_dir: &str,
         element_infotab: &HashMap<String, Element>,
+        potentials_loc: &str,
     ) -> Result<(), Box<dyn Error>> {
-        let target_dir = export_destination(lattice)?;
+        let target_dir = export_destination(lattice, target_root_dir)?;
         lattice
             .get_element_list()
             .iter()
             .try_for_each(|elm| -> Result<(), Box<dyn Error>> {
                 let pot_file = &element_infotab.get(elm).unwrap().pot;
-                let original_file = format!("./resources/Potentials/{}", pot_file);
+                let original_file = format!("{potentials_loc}/{pot_file}");
                 let original_path = Path::new(&original_file);
                 let dest_path = target_dir.join(pot_file);
                 if !dest_path.exists() {
@@ -367,8 +388,11 @@ MP_OFFSET :   0.000000000000000e+000
             })?;
         Ok(())
     }
-    fn copy_smcastep_extension(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
-        let target_dir = export_destination(lattice)?;
+    fn copy_smcastep_extension(
+        lattice: &Lattice,
+        target_root_dir: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let target_dir = export_destination(lattice, target_root_dir)?;
         let target_filename = format!("SMCastep_Extension_{}.xms", lattice.lattice_name());
         let target_path = target_dir.join(target_filename);
         if !target_path.exists() {
@@ -376,8 +400,8 @@ MP_OFFSET :   0.000000000000000e+000
         }
         Ok(())
     }
-    fn write_lsf_script(lattice: &Lattice) -> Result<(), Box<dyn Error>> {
-        let target_dir = export_destination(lattice)?;
+    fn write_lsf_script(lattice: &Lattice, target_root_dir: &str) -> Result<(), Box<dyn Error>> {
+        let target_dir = export_destination(lattice, target_root_dir)?;
         let cell_name = lattice.lattice_name();
         let cmd = format!("/home-yw/Soft/msi/MS70/MaterialsStudio7.0/etc/CASTEP/bin/RunCASTEP.sh -np $NP {cell_name}");
         let prefix = r#"APP_NAME=intelY_mid

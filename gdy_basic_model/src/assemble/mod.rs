@@ -1,3 +1,4 @@
+/// Assemble adsorbate and lattice.
 use std::{collections::HashMap, error::Error};
 
 use crate::molecule::adsorbate::Adsorbate;
@@ -19,7 +20,7 @@ pub trait AdsAddition {
     ) -> Result<(), Box<dyn Error>>;
     fn add_ads(
         &mut self,
-        ads: &mut Adsorbate,
+        ads: &Adsorbate,
         site_1: u32,
         site_2: Option<u32>,
         height: f64,

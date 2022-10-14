@@ -10,10 +10,6 @@ pub struct Atom {
     element_id: u32,
     xyz: Point3<f64>,
     atom_id: u32,
-    // lcao: u8,
-    // mass: f64,
-    // pot: String,
-    // spin: u8,
 }
 
 pub trait AtomArray {
@@ -107,25 +103,12 @@ impl AtomArrayRef for &[Atom] {
 }
 
 impl Atom {
-    pub fn new(
-        element_name: String,
-        element_id: u32,
-        xyz: Point3<f64>,
-        atom_id: u32,
-        // lcao: u8,
-        // mass: f64,
-        // pot: String,
-        // spin: u8,
-    ) -> Self {
+    pub fn new(element_name: String, element_id: u32, xyz: Point3<f64>, atom_id: u32) -> Self {
         Self {
             element_name,
             element_id,
             xyz,
             atom_id,
-            // lcao,
-            // mass,
-            // pot,
-            // spin,
         }
     }
 
@@ -150,18 +133,6 @@ impl Atom {
     pub fn atom_id(&self) -> u32 {
         self.atom_id
     }
-    // pub fn lcao(&self) -> u8 {
-    //     self.lcao
-    // }
-    // pub fn spin(&self) -> u8 {
-    //     self.spin
-    // }
-    // pub fn potential_file(&self) -> String {
-    //     self.pot.to_string()
-    // }
-    // pub fn mass(&self) -> f64 {
-    //     self.mass
-    // }
 
     pub fn set_atom_id(&mut self, atom_id: u32) {
         self.atom_id = atom_id;

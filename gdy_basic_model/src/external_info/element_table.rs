@@ -29,14 +29,15 @@ impl YamlTable for ElmTab {
         let table: ElmTab = serde_yaml::from_reader(yaml_table)?;
         Ok(table)
     }
-    fn hash_table<P: AsRef<Path>>(
-        filepath: P,
-    ) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>> {
-        let table = Self::load_table(filepath)?;
+    fn hash_table(&self) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>> {
         let mut hash_tab: HashMap<String, Element> = HashMap::new();
-        table.elements.unwrap().iter().for_each(|elm: &Element| {
-            hash_tab.insert(elm.element.to_string(), elm.deref().clone());
-        });
+        self.elements
+            .as_ref()
+            .unwrap()
+            .iter()
+            .for_each(|elm: &Element| {
+                hash_tab.insert(elm.element.to_string(), elm.deref().clone());
+            });
         Ok(hash_tab)
     }
 }

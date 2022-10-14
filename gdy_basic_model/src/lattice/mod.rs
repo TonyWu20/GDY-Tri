@@ -7,7 +7,7 @@ use na::{Matrix3, Translation3, Unit, UnitQuaternion, Vector, Vector3};
 use crate::molecule::adsorbate::Adsorbate;
 use crate::{
     assemble::AdsAddition,
-    atom::{Atom, AtomArray, AtomArrayRef},
+    atom::{Atom, AtomArrayRef},
     Export, Transformation,
 };
 
@@ -95,26 +95,26 @@ impl Lattice {
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
         self.rotate(rot_quatd);
     }
-    pub fn update_base_name(&mut self) {
-        // Collect all metal's symbols
-        let metal_names: Vec<String> = self
-            .metal_sites
-            .iter()
-            .map(|metal_id| -> String {
-                self.atoms_vec
-                    .get_atom_by_id(*metal_id)
-                    .unwrap()
-                    .element_name()
-                    .to_string()
-            })
-            .collect::<Vec<String>>();
-        // Because we have only 3 metal elements
-        let new_name = format!(
-            "GDY_{}_{}_{}",
-            metal_names[0], metal_names[1], metal_names[2]
-        );
-        self.set_lattice_name(new_name);
-    }
+    // pub fn update_base_name(&mut self) {
+    //     // Collect all metal's symbols
+    //     let metal_names: Vec<String> = self
+    //         .metal_sites
+    //         .iter()
+    //         .map(|metal_id| -> String {
+    //             self.atoms_vec
+    //                 .get_atom_by_id(*metal_id)
+    //                 .unwrap()
+    //                 .element_name()
+    //                 .to_string()
+    //         })
+    //         .collect::<Vec<String>>();
+    //     // Because we have only 3 metal elements
+    //     let new_name = format!(
+    //         "GDY_{}_{}_{}",
+    //         metal_names[0], metal_names[1], metal_names[2]
+    //     );
+    //     self.set_lattice_name(new_name);
+    // }
 
     pub fn lattice_name(&self) -> &str {
         self.lattice_name.as_ref()
@@ -202,18 +202,37 @@ impl Lattice {
 
 impl Export for Lattice {
     fn format_output(&self) -> String {
-        let headers: String = concat!(
+        let lattice_vectors = self.get_lattice_vectors();
+        let vec_a_line = format!(
+            "  (A D A3 ({:.12} {:.12} {:.12}))\n",
+            lattice_vectors.column(0).x,
+            lattice_vectors.column(0).y,
+            lattice_vectors.column(0).z
+        );
+        let vec_b_line = format!(
+            "  (A D B3 ({:.12} {:.12} {:.12}))\n",
+            lattice_vectors.column(1).x,
+            lattice_vectors.column(1).y,
+            lattice_vectors.column(1).z
+        );
+        let vec_c_line = format!(
+            "  (A D C3 ({:.12} {:.12} {:.12}))\n",
+            lattice_vectors.column(2).x,
+            lattice_vectors.column(2).y,
+            lattice_vectors.column(2).z
+        );
+        let headers: String = vec![
             "# MSI CERIUS2 DataModel File Version 4 0\n",
             "(1 Model\n",
             "  (A I CRY/DISPLAY (192 256))\n",
             "  (A I PeriodicType 100)\n",
             "  (A C SpaceGroup \"1 1\")\n",
-            "  (A D A3 (16.39518593025 -9.465765010246 0))\n",
-            "  (A D B3 (0 18.93153002049 0))\n",
-            "  (A D C3 (0 0 9.999213039981))\n",
-            "  (A D CRY/TOLERANCE 0.05)\n"
-        )
-        .to_string();
+            &vec_a_line,
+            &vec_b_line,
+            &vec_c_line,
+            "  (A D CRY/TOLERANCE 0.05)\n",
+        ]
+        .join("");
         let atom_strings: String = self.atoms_vec.format_output();
         let contents: String = format!("{}{})", headers, atom_strings);
         contents
@@ -291,48 +310,49 @@ impl AdsAddition for Lattice {
 
     fn add_ads(
         &mut self,
-        ads: &mut Adsorbate,
+        ads: &Adsorbate,
         site_1: u32,
         site_2: Option<u32>,
         height: f64,
         flip_upright: bool,
         coord_site_dict: &HashMap<u32, String>,
     ) -> Result<(), Box<dyn Error>> {
-        Self::init_ads_direction(&self, ads, site_1, site_2, flip_upright)?;
+        let mut ads_clone = ads.clone();
+        Self::init_ads_direction(&self, &mut ads_clone, site_1, site_2, flip_upright)?;
         /*
         If site_2 exists or the adsorbate has two coordination atoms,
         the coordinate sites follows the adsorbate info.
         If site_2 does not exists and the adsorbate has one coordinate atom,
         both sites are assigned to the only one coordinate atom.
         */
-        let (cd_1, cd_2) = if site_2.is_some() || ads.coord_atom_nums() == 2 {
-            (ads.coord_atom_ids()[0], ads.coord_atom_ids()[1])
+        let (cd_1, cd_2) = if site_2.is_some() || ads_clone.coord_atom_nums() == 2 {
+            (ads_clone.coord_atom_ids()[0], ads_clone.coord_atom_ids()[1])
         } else {
-            (ads.coord_atom_ids()[0], ads.coord_atom_ids()[0])
+            (ads_clone.coord_atom_ids()[0], ads_clone.coord_atom_ids()[0])
         };
-        let (carbon_1, carbon_2) = if site_2.is_some() || ads.coord_atom_nums() == 2 {
+        let (lat_site_1, lat_site_2) = if site_2.is_some() || ads.coord_atom_nums() == 2 {
             (site_1, site_2.unwrap())
         } else {
             (site_1, site_1)
         };
         // Get the center coordinates of the two carbon sites.
-        let carbon_sites = (
-            self.atoms_vec().get_atom_by_id(carbon_1)?.xyz().clone(),
-            self.atoms_vec().get_atom_by_id(carbon_2)?.xyz().clone(),
+        let lat_sites = (
+            self.atoms_vec().get_atom_by_id(lat_site_1)?.xyz().clone(),
+            self.atoms_vec().get_atom_by_id(lat_site_2)?.xyz().clone(),
         );
         let cd_sites = (
-            ads.atoms_vec().get_atom_by_id(cd_1)?.xyz().clone(),
-            ads.atoms_vec().get_atom_by_id(cd_2)?.xyz().clone(),
+            ads_clone.atoms_vec().get_atom_by_id(cd_1)?.xyz().clone(),
+            ads_clone.atoms_vec().get_atom_by_id(cd_2)?.xyz().clone(),
         );
-        let carbon_sites_centroid = na::center(&carbon_sites.0, &carbon_sites.1);
+        let lat_sites_centroid = na::center(&lat_sites.0, &lat_sites.1);
         let cd_sites_centroid = na::center(&cd_sites.0, &cd_sites.1);
-        let mut trans_matrix = Translation3::from(carbon_sites_centroid - cd_sites_centroid);
+        let mut trans_matrix = Translation3::from(lat_sites_centroid - cd_sites_centroid);
         trans_matrix.vector.z += height;
-        ads.atoms_vec_mut().translate(trans_matrix);
-        self.add_atoms(ads.atoms_vec())?;
-        self.set_adsorbate_name(ads.mol_name().to_string());
-        self.set_pathway(Some(ads.pathway_name().to_string()));
-        self.append_mol_name(ads, site_1, site_2, coord_site_dict)?;
+        ads_clone.atoms_vec_mut().translate(trans_matrix);
+        self.add_atoms(ads_clone.atoms_vec())?;
+        self.set_adsorbate_name(ads_clone.mol_name().to_string());
+        self.set_pathway(Some(ads_clone.pathway_name().to_string()));
+        self.append_mol_name(&ads_clone, site_1, site_2, coord_site_dict)?;
         Ok(())
     }
 }

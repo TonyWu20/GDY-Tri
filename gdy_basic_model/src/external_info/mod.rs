@@ -1,3 +1,4 @@
+/// Deal with yaml parsing to load configurations for tasks.
 use std::{collections::HashMap, error::Error, path::Path};
 
 pub mod adsorbate_table;
@@ -8,9 +9,7 @@ pub trait YamlTable {
     type Table;
     type TableItem;
     fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn Error>>;
-    fn hash_table<P: AsRef<Path>>(
-        filepath: P,
-    ) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>>;
+    fn hash_table(&self) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>>;
 }
 
 #[test]
@@ -23,14 +22,15 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     println!("{}", table.elements.is_some());
     table
         .elements
+        .as_ref()
         .unwrap()
         .iter()
         .for_each(|elm| println!("{:#?}", elm));
-    let hashtab = ElmTab::hash_table(project_info.element_table_loc())?;
+    let hashtab = table.hash_table()?;
     println!("{:#?}", hashtab.get("C").unwrap());
     let ads_table = AdsTab::load_table(project_info.adsorbate_table_loc())?;
     assert!(ads_table.adsorbates().is_some());
-    let hash_ads_tab = AdsTab::hash_table(project_info.adsorbate_table_loc())?;
+    let hash_ads_tab = ads_table.hash_table()?;
     assert_eq!(
         vec![1, 2, 3],
         hash_ads_tab.get("CH2CHOH").unwrap().plane_atom_ids()

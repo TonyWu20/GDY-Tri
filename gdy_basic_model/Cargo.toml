@@ -1,17 +1,17 @@
 [package]
-name = "gdy_model"
+name = "castep_model_generator_backend"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
- regex = "1"
- nalgebra = "*"
- periodic_table = "0.3.2"
- periodic-table-on-an-enum = "0.3.2"
- indicatif = "0"
- serde_yaml = "0.8.*"
- serde = {version= "*", features=["derive"]}
- rayon = "*"
- glob = "0"
+regex = "1"
+nalgebra = "*"
+periodic_table = "0.3.2"
+periodic-table-on-an-enum = "0.3.2"
+indicatif = "0"
+serde_yaml = "0.8.*"
+serde = { version = "*", features = ["derive"] }
+rayon = "*"
+glob = "0"

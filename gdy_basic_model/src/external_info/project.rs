@@ -1,3 +1,7 @@
+/**
+Module for loading `project.yaml`, which has necessary information to control
+the program.
+*/
 extern crate serde;
 use std::{collections::HashMap, error::Error, fs, path::Path};
 
@@ -77,6 +81,13 @@ impl CoordCase {
     }
 }
 
+/**
+Load project `yaml` from given path
+# Arguments
+* `filepath` - Type that has trait `AsRef<Path>`
+# Returns
+* `Result<ProjectInfo, Box<dyn Error>`
+*/
 pub fn load_project_info<P: AsRef<Path>>(filepath: P) -> Result<ProjectInfo, Box<dyn Error>> {
     let project_yaml = fs::File::open(filepath)?;
     let project_table = serde_yaml::from_reader(project_yaml)?;

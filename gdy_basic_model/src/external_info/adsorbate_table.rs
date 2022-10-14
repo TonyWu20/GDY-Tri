@@ -1,3 +1,4 @@
+/// Parse adsorbate info `yaml` file to get necessary information for loading adsorbate models.
 extern crate serde;
 use std::{
     collections::HashMap,
@@ -106,12 +107,12 @@ impl YamlTable for AdsTab {
         Ok(ads_table)
     }
 
-    fn hash_table<P: AsRef<Path>>(
-        filepath: P,
+    fn hash_table(
+        &self,
     ) -> Result<std::collections::HashMap<String, Self::TableItem>, Box<dyn Error>> {
-        let table = Self::load_table(filepath)?;
         let mut hash_tab: HashMap<String, AdsInfo> = HashMap::new();
-        table.adsorbates.unwrap().iter().for_each(|ads: &AdsInfo| {
+        let adsinfo_vec: &Vec<AdsInfo> = self.adsorbates.as_ref().unwrap();
+        adsinfo_vec.iter().for_each(|ads: &AdsInfo| {
             hash_tab.insert(ads.name.to_string(), ads.deref().clone());
         });
         Ok(hash_tab)

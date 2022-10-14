@@ -2,7 +2,7 @@
 pub mod assemble;
 pub mod atom;
 pub mod cell;
-pub mod editor;
+// pub mod editor;
 pub mod external_info;
 pub mod lattice;
 pub mod molecule;
