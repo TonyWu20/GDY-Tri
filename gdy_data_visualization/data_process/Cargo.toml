@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-polars = "0"
+polars = { version = "0", features = ["lazy", "csv-file"] }
 polars-lazy = { version = "0", features = ["regex"] }
 ndarray = "0"

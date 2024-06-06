@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 config_parser = { path = "../config_parser" }
-data_process = { path = "../data_process" }
+# data_process = { path = "../data_process" }
+data_parser = { path = "../data_parser" }
+csv = "1.1"

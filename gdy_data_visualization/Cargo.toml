@@ -1,2 +1,2 @@
 [workspace]
-members = ["gdy_visualize", "config_parser", "data_process"]
+members = ["gdy_visualize", "config_parser", "data_parser"]

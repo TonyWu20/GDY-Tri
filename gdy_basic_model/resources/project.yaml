@@ -2,7 +2,7 @@ base_model_loc: ./resources/GDY_tri.msi
 element_table_loc: resources/element_table.yaml
 adsorbate_table_loc: resources/ads_table.yaml
 potentials_loc: resources/Potentials
-export_loc: GDY_TAC_models
+export_loc: GDY_TAC_models_test
 coord_sites:
   - name: c1
     atom_id: 41

@@ -12,6 +12,9 @@ pub mod gdy_tri_editor {
     use pt::Element;
 
     use castep_model_generator_backend::parser::msi_parser::parse_lattice;
+    fn lattice_update_base_name(target_lattice: &mut Lattice) {
+        todo!();
+    }
     pub fn change_atom_element(
         target_atom: &mut Atom,
         new_element_name: &str,
