@@ -6,7 +6,8 @@ edition = "2021"
 [dependencies]
 castep-cell-io = {git = "https://github.com/TonyWu20/castep-cell-io", branch = "dev"}
 castep-periodic-table = "0.5"
-nalgebra = "0.32"
+nalgebra = "0.33"
 itertools = "0.13"
 rayon = "1.10"
 indicatif = {version = "0.17.8", features = ["rayon"]}
+crystal-cif-io ={git = "https://github.com/TonyWu20/crystal-cif-io"}
