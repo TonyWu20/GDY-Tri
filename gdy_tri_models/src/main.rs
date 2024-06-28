@@ -1,6 +1,7 @@
-use std::{fs::create_dir, io, path::Path};
+use std::{error::Error, fs::create_dir, io, path::Path};
 
 use castep_cell_io::CastepTask;
+use chemrust_misctools::to_xsd_scripts;
 use edit::generate_models;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
@@ -11,7 +12,7 @@ mod edit;
 mod export;
 mod template;
 
-fn execution() -> Result<(), io::Error> {
+fn execution() -> Result<(), Box<dyn Error>> {
     let potentials_loc = Path::new(env!("CARGO_MANIFEST_DIR")).join("Potentials");
     let dest_dir = Path::new("GDY_TAC_Models");
     if !dest_dir.exists() {
@@ -30,9 +31,16 @@ fn execution() -> Result<(), io::Error> {
                 model_dir,
             )
         })
-        .try_for_each(|seed| seed.write_to_dir())
+        .try_for_each(|seed| {
+            #[cfg(not(debug_assertions))]
+            {
+                seed.copy_potentials()
+            }
+            seed.write_to_dir()
+        })?;
+    to_xsd_scripts(dest_dir)
 }
 
-fn main() -> Result<(), io::Error> {
+fn main() -> Result<(), Box<dyn Error>> {
     execution()
 }
