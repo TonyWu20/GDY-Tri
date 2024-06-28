@@ -67,8 +67,8 @@ impl<P: AsRef<Path>> SeedFilePackage<P> {
 
     pub fn write_to_dir(&self) -> Result<(), io::Error> {
         self.directory_check()?;
-        self.geom_pack.write_cif_to_path(&self.output_dir)?;
         self.geom_pack.write_to_path(&self.output_dir)?;
+        self.geom_pack.write_cif_to_path(&self.output_dir)?;
         self.geom_pack.write_script(&self.output_dir)?;
         self.bs_pack.write_to_path(&self.output_dir)
     }

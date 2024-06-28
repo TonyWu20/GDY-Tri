@@ -31,12 +31,13 @@ fn execution() -> Result<(), Box<dyn Error>> {
                 model_dir,
             )
         })
-        .try_for_each(|seed| {
+        .try_for_each(|seed| -> Result<(), io::Error> {
+            seed.write_to_dir()?;
             #[cfg(not(debug_assertions))]
             {
-                seed.copy_potentials()
+                seed.copy_potentials()?;
             }
-            seed.write_to_dir()
+            Ok(())
         })?;
     to_xsd_scripts(dest_dir)
 }
