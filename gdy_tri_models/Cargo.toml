@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-castep-cell-io = "0.2.5"
+castep-cell-io = "0.2.6"
 castep-periodic-table = "0.5"
 nalgebra = "0.33"
 itertools = "0.13"
