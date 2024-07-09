@@ -6,20 +6,7 @@ use std::{
 
 use castep_cell_io::{CastepParams, CastepTask, CellDocument, SeedfileGenerator};
 use chemrust_misctools::{write_server_script, ServerScriptType};
-use crystal_cif_io::{
-    data_dict::{
-        core_cif::{
-            atom_site::LoopAtomSiteData,
-            cell::CellDataSection,
-            space_group::{
-                CrystalSystemCif, ITNumber, SpaceGroupItem, SpaceGroupLoopData, SpaceGroupLoopItem,
-                SpaceGroupSection,
-            },
-        },
-        CifData, DataBlock, LoopDataEntry,
-    },
-    CifFile,
-};
+use crystal_cif_io::to_cif_document;
 
 use crate::edit::Model;
 
@@ -109,34 +96,11 @@ impl ExportPackage {
     }
 
     pub fn write_cif_to_path<P: AsRef<Path>>(&self, dest_dir: P) -> Result<(), io::Error> {
-        let space_group_section = SpaceGroupSection::init_builder()
-            .add_entry(SpaceGroupItem::Crystal_system(CrystalSystemCif::Triclinic))
-            .add_entry(SpaceGroupItem::IT_number(ITNumber::new(1)))
-            .finish();
-        let data_block = DataBlock::init_with_builder()
-            .add_section(CifData::SpaceGroup(space_group_section))
-            .add_section(CifData::SpaceGroupLoop(
-                SpaceGroupLoopData::init_builder()
-                    .add_entry(
-                        LoopDataEntry::init_builder()
-                            .add_entry(SpaceGroupLoopItem::Symop_operation_xyz("x,y,z".to_string()))
-                            .finish(),
-                    )
-                    .finish(),
-            ))
-            .add_section(CifData::CellData(CellDataSection::from(
-                self.full_cell_doc.model_description().lattice_block(),
-            )))
-            .add_section(CifData::AtomSiteLoop(LoopAtomSiteData::from(
-                self.full_cell_doc.model_description().ionic_pos_block(),
-            )))
-            .with_name(&self.filename_stem)
-            .finish();
-        let cif_file = CifFile::new(vec![data_block]);
+        let cif_document = to_cif_document(&self.full_cell_doc, &self.filename_stem);
         let cif_path = Path::new(dest_dir.as_ref())
             .join(&self.filename_stem)
             .with_extension("cif");
-        fs::write(cif_path, format!("{}", cif_file))
+        fs::write(cif_path, format!("{}", cif_document))
     }
 
     pub fn write_to_path<P: AsRef<Path>>(&self, dest_dir: P) -> Result<(), io::Error> {
