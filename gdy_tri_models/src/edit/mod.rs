@@ -107,6 +107,7 @@ fn edit_template(template: &CellDocument, combo: &[ElementSymbol; 3]) -> CellDoc
 #[cfg(test)]
 mod test {
     use castep_periodic_table::element::ElementSymbol;
+    use itertools::Itertools;
 
     use crate::template::load_template;
 
@@ -126,5 +127,27 @@ mod test {
             .unwrap()
             .iter()
             .for_each(|pos| println!("{}", pos.symbol()));
+    }
+    fn element_lists() -> Vec<ElementSymbol> {
+        [(21..=30), (39..=48), (72..=80), (57..=71)]
+            // [(21..=30), (39..=48)]
+            .into_iter()
+            .flat_map(|rg| {
+                rg.map(|i| ElementSymbol::try_from(i as u8).unwrap())
+                    .collect::<Vec<ElementSymbol>>()
+            })
+            .collect()
+    }
+    #[test]
+    fn combinations() {
+        let list = element_lists();
+        // let mut used_combos: HashSet<[ElementSymbol; 3]> = HashSet::new();
+        let combos: Vec<[ElementSymbol; 3]> = list
+            .into_iter()
+            .combinations_with_replacement(3)
+            .map(|combo| combo.try_into().unwrap())
+            .collect::<Vec<[ElementSymbol; 3]>>();
+        dbg!(&combos);
+        dbg!(combos.len());
     }
 }

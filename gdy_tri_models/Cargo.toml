@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-castep-cell-io = "0.2.12"
+castep-cell-io = "0.2.18"
 castep-periodic-table = "0.5"
 nalgebra = "0.33"
 itertools = "0.13"
 rayon = "1.10"
-indicatif = {version = "0.17.8", features = ["rayon"]}
-crystal-cif-io ={git = "https://github.com/TonyWu20/crystal-cif-io", branch = "dev", features= ["chemrust-core"]}
-chemrust-misctools = {git = "https://github.com/TonyWu20/chemrust", branch = "refactor"}
+indicatif = { version = "0.17.8", features = ["rayon"] }
+crystal-cif-io = { git = "https://github.com/TonyWu20/crystal-cif-io", branch = "dev", features = [
+	"chemrust-core",
+] }
+chemrust-misctools = { git = "https://github.com/TonyWu20/chemrust", branch = "refactor" }

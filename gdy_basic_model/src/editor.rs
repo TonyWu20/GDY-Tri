@@ -102,3 +102,19 @@ pub mod gdy_tri_editor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use castep_periodic_table::element::Element;
+    use periodic_table as pt;
+
+    #[test]
+    fn elements() {
+        let elements: &[&Element] = pt::periodic_table();
+        let metals_3d: &[&Element] = &elements[20..30];
+        let metals_4d: &[&Element] = &elements[38..48];
+        let metals_5d: &[&Element] = &elements[71..80];
+        let metals_rare_earth: &[&Element] = &elements[56..71];
+        dbg!(metals_5d);
+    }
+}

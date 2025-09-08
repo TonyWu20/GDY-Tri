@@ -17,3 +17,4 @@ gdy_tri_models/GDY_TAC_Models
 # System dump files
 **/.DS_Store
 
+.direnv
